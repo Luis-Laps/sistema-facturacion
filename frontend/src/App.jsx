@@ -7,7 +7,7 @@ import Clientes from "./pages/Clientes";
 import Facturas from "./pages/Facturas";
 import HistorialFacturas from "./pages/HistorialFacturas";
 import Configuracion from "./pages/Configuracion";
-import ImprimirFactura from "./pages/ImprimirFactura";
+import ImprimirFacturaTicket from "./pages/ImprimirFacturaTicket";
 import Usuarios from "./pages/Usuarios";
 
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -28,8 +28,10 @@ function App() {
 
         <Route path="/historial-facturas" element={<HistorialFacturas />} />
 
-        <Route path="/imprimir-factura/:id" element={<ImprimirFactura />} />
-
+        <Route
+          path="/imprimir-factura/:id"
+          element={<ImprimirFacturaTicket />}
+        />
         <Route
           path="/usuarios"
           element={

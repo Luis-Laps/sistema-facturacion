@@ -1,0 +1,123 @@
+.ticket {
+  width: 80mm;
+  margin: 0 auto;
+  padding: 5mm;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+}
+
+.logo {
+  width: 110px;
+  display: block;
+  margin: 0 auto 10px;
+}
+
+.empresa {
+  text-align: center;
+}
+
+.empresa h2 {
+  margin: 5px 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.empresa h3 {
+  margin: 8px 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.empresa p {
+  margin: 2px 0;
+  font-size: 11px;
+}
+
+.cajero {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.info-ticket {
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.fila {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
+}
+
+.fila span:first-child {
+  font-weight: bold;
+}
+
+.item {
+  margin-bottom: 8px;
+}
+
+.producto {
+  font-weight: bold;
+  word-break: break-word;
+  margin-bottom: 3px;
+}
+
+.detalle-producto {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.total {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.titulo-total {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.monto-total {
+  font-size: 28px;
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+.footer {
+  text-align: center;
+  font-size: 12px;
+  margin-top: 15px;
+}
+
+hr {
+  border: none;
+  border-top: 1px dashed #000;
+  margin: 8px 0;
+}
+
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .ticket {
+    width: 80mm;
+    padding: 4mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
