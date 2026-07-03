@@ -1,18 +1,35 @@
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 
 function Productos() {
   const [productos, setProductos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
 
-  const [nombre, setNombre] = useState("");
-  const [precio, setPrecio] = useState("");
-  const [stock, setStock] = useState("");
+  const [busqueda, setBusqueda] = useState("");
 
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [editando, setEditando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
-  const [editNombre, setEditNombre] = useState("");
-  const [editPrecio, setEditPrecio] = useState("");
-  const [editStock, setEditStock] = useState("");
+
+  const crearProductoVacio = () => ({
+    codigo: `ART-${Date.now().toString().slice(-6)}`,
+    nombre: "",
+    categoria_id: "",
+    descripcion: "",
+    costo_compra: "",
+    porcentaje_ganancia: 30,
+    precio_venta: "",
+    stock: "",
+    tipo: "PRODUCTO",
+  });
+
+  const [producto, setProducto] = useState(crearProductoVacio());
+
+  // ==========================
+  // CARGAR PRODUCTOS
+  // ==========================
 
   const cargarProductos = async () => {
     try {
@@ -23,184 +40,464 @@ function Productos() {
     }
   };
 
+  // ==========================
+  // CARGAR CATEGORIAS
+  // ==========================
+
+  const cargarCategorias = async () => {
+    try {
+      const response = await api.get("/categorias");
+      setCategorias(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // ==========================
+  // INPUTS
+  // ==========================
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    let nuevo = {
+      ...producto,
+      [name]: value,
+    };
+
+    let costo = Number(nuevo.costo_compra) || 0;
+    let porcentaje = Number(nuevo.porcentaje_ganancia) || 0;
+
+    if (name === "costo_compra" || name === "porcentaje_ganancia") {
+      nuevo.precio_venta = (costo + costo * (porcentaje / 100)).toFixed(2);
+    }
+
+    if (name === "precio_venta") {
+      const precio = Number(value) || 0;
+
+      if (costo > 0) {
+        nuevo.porcentaje_ganancia = (((precio - costo) / costo) * 100).toFixed(
+          2,
+        );
+      }
+    }
+
+    setProducto(nuevo);
+  };
+
+  // ==========================
+  // NUEVO
+  // ==========================
+
+  const nuevoProducto = () => {
+    setProducto(crearProductoVacio());
+    setEditando(false);
+    setEditandoId(null);
+    setMostrarModal(true);
+  };
+
+  // ==========================
+  // GUARDAR
+  // ==========================
+
   const guardarProducto = async () => {
     try {
-      await api.post("/productos", {
-        nombre,
-        precio,
-        stock,
-      });
+      if (!producto.codigo || !producto.nombre || !producto.categoria_id) {
+        Swal.fire("Atención", "Complete los campos obligatorios.", "warning");
+        return;
+      }
 
-      setNombre("");
-      setPrecio("");
-      setStock("");
+      const datos = {
+        codigo: producto.codigo,
+        nombre: producto.nombre,
+        categoria_id: Number(producto.categoria_id),
+        descripcion: producto.descripcion,
+        costo_compra: Number(producto.costo_compra),
+        precio_venta: Number(producto.precio_venta),
+        stock: Number(producto.stock),
+        tipo: producto.tipo,
+      };
 
+      if (editando) {
+        await api.put(`/productos/${editandoId}`, datos);
+
+        Swal.fire({
+          icon: "success",
+          title: "Producto actualizado",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        await api.post("/productos", datos);
+
+        Swal.fire({
+          icon: "success",
+          title: "Producto registrado",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+
+      setMostrarModal(false);
       cargarProductos();
     } catch (error) {
       console.error(error);
-      alert("Error al guardar producto");
+
+      Swal.fire(
+        "Error",
+        error.response?.data?.mensaje || "Ocurrió un error.",
+        "error",
+      );
     }
   };
 
-  const iniciarEdicion = (producto) => {
-    setEditandoId(producto.id);
-    setEditNombre(producto.nombre);
-    setEditPrecio(producto.precio);
-    setEditStock(producto.stock);
+  // ==========================
+  // EDITAR
+  // ==========================
+
+  const editarProducto = (item) => {
+    const porcentaje =
+      item.costo_compra > 0
+        ? (
+            ((item.precio_venta - item.costo_compra) / item.costo_compra) *
+            100
+          ).toFixed(2)
+        : 0;
+
+    setProducto({
+      codigo: item.codigo,
+      nombre: item.nombre,
+      categoria_id: item.categoria_id,
+      descripcion: item.descripcion || "",
+      costo_compra: item.costo_compra,
+      precio_venta: item.precio_venta,
+      porcentaje_ganancia: porcentaje,
+      stock: item.stock,
+      tipo: item.tipo || "PRODUCTO",
+    });
+
+    setEditando(true);
+    setEditandoId(item.id);
+    setMostrarModal(true);
   };
 
-  const guardarEdicion = async () => {
-    try {
-      await api.put(`/productos/${editandoId}`, {
-        nombre: editNombre,
-        precio: editPrecio,
-        stock: editStock,
-      });
+  // ==========================
+  // ELIMINAR
+  // ==========================
 
-      setEditandoId(null);
-      cargarProductos();
-    } catch (error) {
-      console.error(error);
-      alert("Error al actualizar producto");
-    }
-  };
+  const eliminarProducto = async (id, nombre) => {
+    const confirmar = await Swal.fire({
+      title: "Eliminar producto",
+      text: `¿Desea eliminar "${nombre}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí",
+      cancelButtonText: "Cancelar",
+    });
 
-  const eliminarProducto = async (id) => {
-    const confirmar = window.confirm("¿Desea eliminar este producto?");
-
-    if (!confirmar) return;
+    if (!confirmar.isConfirmed) return;
 
     try {
       await api.delete(`/productos/${id}`);
+
+      Swal.fire({
+        icon: "success",
+        title: "Producto eliminado",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+
       cargarProductos();
     } catch (error) {
       console.error(error);
-      alert("Error al eliminar producto");
+
+      Swal.fire("Error", "No se pudo eliminar el producto.", "error");
     }
   };
 
+  // ==========================
+  // BUSCAR
+  // ==========================
+
+  const productosFiltrados = productos.filter((p) => {
+    const texto = busqueda.toLowerCase();
+
+    return (
+      (p.nombre ?? "").toLowerCase().includes(texto) ||
+      (p.codigo ?? "").toLowerCase().includes(texto) ||
+      (p.categoria ?? "").toLowerCase().includes(texto)
+    );
+  });
+
   useEffect(() => {
     cargarProductos();
+    cargarCategorias();
   }, []);
-
   return (
     <>
       <Navbar />
 
       <div className="container mt-4">
-        <h2>Productos</h2>
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h2>Productos</h2>
+            <small className="text-muted">Total: {productos.length}</small>
+          </div>
 
-        <div className="card p-3 mb-4">
-          <h5>Nuevo Producto</h5>
-
-          <input
-            className="form-control mb-2"
-            placeholder="Nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-          />
-
-          <input
-            type="number"
-            className="form-control mb-2"
-            placeholder="Precio"
-            value={precio}
-            onChange={(e) => setPrecio(e.target.value)}
-          />
-
-          <input
-            type="number"
-            className="form-control mb-2"
-            placeholder="Stock"
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-          />
-
-          <button className="btn btn-success" onClick={guardarProducto}>
-            Guardar Producto
+          <button className="btn btn-success" onClick={nuevoProducto}>
+            + Nuevo Producto
           </button>
         </div>
 
-        <table className="table table-bordered table-striped">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Precio</th>
-              <th>Stock</th>
-              <th width="220">Acciones</th>
-            </tr>
-          </thead>
+        <div className="card shadow-sm mb-4">
+          <div className="card-body">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Buscar por código o nombre..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+        </div>
 
-          <tbody>
-            {productos.map((producto) => (
-              <tr key={producto.id}>
-                <td>{producto.id}</td>
+        <div className="card shadow-sm">
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-dark">
+                <tr>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Costo</th>
+                  <th>Venta</th>
+                  <th>Ganancia</th>
+                  <th>Cantidad</th>
+                  <th width="170">Acciones</th>
+                </tr>
+              </thead>
 
-                <td>
-                  {editandoId === producto.id ? (
-                    <input
-                      className="form-control"
-                      value={editNombre}
-                      onChange={(e) => setEditNombre(e.target.value)}
-                    />
-                  ) : (
-                    producto.nombre
-                  )}
-                </td>
+              <tbody>
+                {productosFiltrados.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="text-center py-4">
+                      No hay productos registrados.
+                    </td>
+                  </tr>
+                )}
 
-                <td>
-                  {editandoId === producto.id ? (
-                    <input
-                      className="form-control"
-                      value={editPrecio}
-                      onChange={(e) => setEditPrecio(e.target.value)}
-                    />
-                  ) : (
-                    <>RD$ {producto.precio}</>
-                  )}
-                </td>
+                {productosFiltrados.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.codigo}</td>
 
-                <td>
-                  {editandoId === producto.id ? (
-                    <input
-                      className="form-control"
-                      value={editStock}
-                      onChange={(e) => setEditStock(e.target.value)}
-                    />
-                  ) : (
-                    producto.stock
-                  )}
-                </td>
+                    <td>{item.nombre}</td>
 
-                <td>
-                  {editandoId === producto.id ? (
-                    <button
-                      className="btn btn-success btn-sm me-2"
-                      onClick={guardarEdicion}
-                    >
-                      Guardar
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-warning btn-sm me-2"
-                      onClick={() => iniciarEdicion(producto)}
-                    >
-                      Editar
-                    </button>
-                  )}
+                    <td>{item.categoria}</td>
+
+                    <td>RD$ {Number(item.costo_compra).toLocaleString()}</td>
+
+                    <td>RD$ {Number(item.precio_venta).toLocaleString()}</td>
+
+                    <td className="text-success fw-bold">
+                      RD${" "}
+                      {(
+                        Number(item.precio_venta) - Number(item.costo_compra)
+                      ).toLocaleString()}
+                    </td>
+
+                    <td>{item.stock}</td>
+
+                    <td>
+                      <button
+                        className="btn btn-warning btn-sm me-2"
+                        onClick={() => editarProducto(item)}
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => eliminarProducto(item.id, item.nombre)}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* MODAL */}
+
+        {mostrarModal && (
+          <div
+            className="modal fade show d-block"
+            style={{
+              backgroundColor: "rgba(0,0,0,.5)",
+            }}
+          >
+            <div className="modal-dialog modal-lg">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    {editando ? "Editar Producto" : "Nuevo Producto"}
+                  </h5>
 
                   <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => eliminarProducto(producto.id)}
+                    className="btn-close"
+                    onClick={() => setMostrarModal(false)}
+                  />
+                </div>
+
+                <div className="modal-body">
+                  <div className="row">
+                    <div className="col-md-4 mb-3">
+                      <label>Código</label>
+
+                      <input
+                        className="form-control"
+                        name="codigo"
+                        value={producto.codigo}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-md-8 mb-3">
+                      <label>Nombre</label>
+
+                      <input
+                        className="form-control"
+                        name="nombre"
+                        value={producto.nombre}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-md-6 mb-3">
+                      <label>Categoría</label>
+
+                      <select
+                        className="form-select"
+                        name="categoria_id"
+                        value={producto.categoria_id}
+                        onChange={handleChange}
+                      >
+                        <option value="">Seleccione...</option>
+
+                        {categorias.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label>Tipo</label>
+
+                      <select
+                        className="form-select"
+                        name="tipo"
+                        value={producto.tipo || "PRODUCTO"}
+                        onChange={handleChange}
+                      >
+                        <option value="PRODUCTO">Producto</option>
+
+                        <option value="SERVICIO">Servicio</option>
+                      </select>
+                    </div>
+
+                    {producto.tipo === "PRODUCTO" && (
+                      <div className="col-md-6 mb-3">
+                        <label>Cantidad en inventario</label>
+
+                        <input
+                          className="form-control"
+                          type="number"
+                          name="stock"
+                          value={producto.stock}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    )}
+
+                    <div className="col-md-4 mb-3">
+                      <label>Costo de compra</label>
+
+                      <input
+                        className="form-control"
+                        type="number"
+                        name="costo_compra"
+                        value={producto.costo_compra}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-md-4 mb-3">
+                      <label>% Ganancia</label>
+
+                      <input
+                        className="form-control"
+                        type="number"
+                        name="porcentaje_ganancia"
+                        value={producto.porcentaje_ganancia}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-md-4 mb-3">
+                      <label>Precio venta</label>
+
+                      <input
+                        className="form-control"
+                        type="number"
+                        name="precio_venta"
+                        value={producto.precio_venta}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-12 mb-3">
+                      <label>Descripción</label>
+
+                      <textarea
+                        rows="3"
+                        className="form-control"
+                        name="descripcion"
+                        value={producto.descripcion}
+                        onChange={handleChange}
+                      />
+                    </div>
+
+                    <div className="col-12">
+                      <div className="alert alert-success">
+                        <strong>Ganancia por unidad:</strong> RD${" "}
+                        {(
+                          Number(producto.precio_venta || 0) -
+                          Number(producto.costo_compra || 0)
+                        ).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setMostrarModal(false)}
                   >
-                    Eliminar
+                    Cancelar
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+                  <button className="btn btn-success" onClick={guardarProducto}>
+                    {editando ? "Actualizar" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

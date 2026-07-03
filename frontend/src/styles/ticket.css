@@ -1,11 +1,14 @@
 .ticket {
   width: 80mm;
-  margin: 0 auto;
+  margin: 0 auto 20px;
   padding: 5mm;
   background: #fff;
   color: #000;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
+  box-sizing: border-box;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 .logo {
@@ -100,21 +103,40 @@ hr {
   margin: 8px 0;
 }
 
+/* Separador entre ambas copias */
+
+.separador-ticket {
+  width: 80mm;
+  margin: 10px auto;
+  border-top: 2px dashed #999;
+}
+
+/* -------------------- */
+
 @page {
   size: 80mm auto;
   margin: 0;
 }
 
 @media print {
+  html,
   body {
     margin: 0;
     padding: 0;
-    background: #fff;
+    background: white;
   }
 
   .ticket {
     width: 80mm;
+    margin: 0 auto 10mm;
     padding: 4mm;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .separador-ticket {
+    margin: 5mm auto;
+    border-top: 2px dashed #999;
   }
 
   .no-print {

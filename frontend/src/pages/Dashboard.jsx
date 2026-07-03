@@ -3,19 +3,33 @@ import Navbar from "../components/Navbar";
 import api from "../services/api";
 
 function Dashboard() {
-  const [periodo, setPeriodo] = useState("dia");
+  const hoy = new Date().toISOString().split("T")[0];
+
+  const primerDiaMes = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    1,
+  )
+    .toISOString()
+    .split("T")[0];
+
+  const [desde, setDesde] = useState(primerDiaMes);
+  const [hasta, setHasta] = useState(hoy);
 
   const [datos, setDatos] = useState({
     productos: 0,
     clientes: 0,
     facturas: 0,
     ventas: 0,
+    ganancias: 0,
     ultimasFacturas: [],
   });
 
   const cargarDashboard = async () => {
     try {
-      const response = await api.get(`/dashboard?periodo=${periodo}`);
+      const response = await api.get(
+        `/dashboard?desde=${desde}&hasta=${hasta}`,
+      );
 
       setDatos(response.data);
     } catch (error) {
@@ -25,7 +39,7 @@ function Dashboard() {
 
   useEffect(() => {
     cargarDashboard();
-  }, [periodo]);
+  }, [desde, hasta]);
 
   return (
     <>
@@ -35,56 +49,120 @@ function Dashboard() {
         <h1 className="mb-4">Dashboard</h1>
 
         <div className="card p-3 mb-4">
-          <label className="form-label">Periodo de Ventas</label>
+          <div className="row">
+            <div className="col-md-5">
+              <label>Desde</label>
 
-          <select
-            className="form-control"
-            value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
-          >
-            <option value="dia">Día</option>
+              <input
+                type="date"
+                className="form-control"
+                value={desde}
+                onChange={(e) => setDesde(e.target.value)}
+              />
+            </div>
 
-            <option value="semana">Semana</option>
+            <div className="col-md-5">
+              <label>Hasta</label>
 
-            <option value="mes">Mes</option>
-
-            <option value="anio">Año</option>
-          </select>
+              <input
+                type="date"
+                className="form-control"
+                value={hasta}
+                onChange={(e) => setHasta(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="row">
-          <div className="col-md-3 mb-3">
-            <div className="card shadow text-center">
+          <div className="col-xl col-lg col-md-6 mb-3">
+            <div
+              className="card text-white shadow"
+              style={{
+                background: "#0d6efd",
+                border: "none",
+                borderRadius: "15px",
+              }}
+            >
+              {" "}
               <div className="card-body">
-                <h5>Productos</h5>
-                <h2>{datos.productos}</h2>
+                <h5>📦 Productos</h5>
+                <h2 className="fw-bold">{datos.productos}</h2>
               </div>
             </div>
           </div>
 
-          <div className="col-md-3 mb-3">
-            <div className="card shadow text-center">
+          <div className="col-xl col-lg col-md-6 mb-3">
+            <div
+              className="card text-white shadow"
+              style={{
+                background: "#6f42c1",
+                border: "none",
+                borderRadius: "15px",
+              }}
+            >
+              {" "}
               <div className="card-body">
-                <h5>Clientes</h5>
-                <h2>{datos.clientes}</h2>
+                <h5>👥 Clientes</h5>
+                <h2 className="fw-bold">{datos.clientes}</h2>
               </div>
             </div>
           </div>
 
-          <div className="col-md-3 mb-3">
-            <div className="card shadow text-center">
+          <div className="col-xl col-lg col-md-6 mb-3">
+            <div
+              className="card text-white shadow"
+              style={{
+                background: "#fd7e14",
+                border: "none",
+                borderRadius: "15px",
+              }}
+            >
               <div className="card-body">
-                <h5>Facturas</h5>
-                <h2>{datos.facturas}</h2>
+                <h5>🧾 Facturas</h5>
+                <h2 className="fw-bold">{datos.facturas}</h2>
               </div>
             </div>
           </div>
 
-          <div className="col-md-3 mb-3">
-            <div className="card shadow text-center">
+          <div className="col-xl col-lg col-md-6 mb-3">
+            <div
+              className="card shadow"
+              style={{
+                background: "#ffc107",
+                border: "none",
+                borderRadius: "15px",
+              }}
+            >
+              {" "}
               <div className="card-body">
-                <h5>Ventas</h5>
-                <h2>RD$ {datos.ventas.toLocaleString()}</h2>
+                <h5>💰 Ventas</h5>
+
+                <h2 className="fw-bold">
+                  RD$ {Number(datos.ventas).toLocaleString("es-DO")}
+                </h2>
+              </div>
+            </div>
+          </div>
+          <div className="col-xl col-lg col-md-6 mb-3">
+            <div
+              className="card text-white shadow"
+              style={{
+                background: "#198754",
+                border: "none",
+                borderRadius: "15px",
+              }}
+            >
+              <div className="card-body text-center">
+                <h5>📈 Ganancias</h5>
+
+                <h2 className="fw-bold">
+                  RD${" "}
+                  {Number(datos.ganancias).toLocaleString("es-DO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </h2>
               </div>
             </div>
           </div>

@@ -11,7 +11,9 @@ function Facturas() {
   const [clienteId, setClienteId] = useState("");
 
   const [productoId, setProductoId] = useState("");
-  const [cantidad, setCantidad] = useState("");
+  const [cantidad, setCantidad] = useState(1);
+  const [precio, setPrecio] = useState("");
+  const [descuento, setDescuento] = useState(0);
 
   const [detalle, setDetalle] = useState([]);
 
@@ -32,7 +34,18 @@ function Facturas() {
   }, []);
 
   const agregarProducto = () => {
-    if (!productoId || !cantidad) {
+    if (!productoId) {
+      alert("Seleccione un producto");
+      return;
+    }
+
+    if (Number(cantidad) <= 0) {
+      alert("La cantidad debe ser mayor que cero");
+      return;
+    }
+
+    if (Number(precio) <= 0) {
+      alert("Ingrese un precio válido");
       return;
     }
 
@@ -43,21 +56,27 @@ function Facturas() {
     const item = {
       producto_id: producto.id,
       nombre: producto.nombre,
-      precio: Number(producto.precio),
+      precio: Number(precio),
       cantidad: Number(cantidad),
+      descuento: Number(descuento),
     };
 
-    setDetalle([...detalle, item]);
+    setDetalle((anterior) => [...anterior, item]);
 
+    // Limpiar formulario
     setProductoId("");
-    setCantidad("");
+    setCantidad(1);
+    setPrecio("");
+    setDescuento(0);
+  };
+  const eliminarItem = (index) => {
+    setDetalle(detalle.filter((_, i) => i !== index));
   };
 
   const calcularTotal = () => {
-    return detalle.reduce(
-      (total, item) => total + item.precio * item.cantidad,
-      0,
-    );
+    return detalle.reduce((total, item) => {
+      return total + item.precio * item.cantidad - item.descuento;
+    }, 0);
   };
 
   const facturar = async () => {
@@ -77,6 +96,8 @@ function Facturas() {
         productos: detalle.map((item) => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,
+          precio: item.precio,
+          descuento: item.descuento,
         })),
       });
 
@@ -128,7 +149,19 @@ function Facturas() {
           <select
             className="form-control mb-2"
             value={productoId}
-            onChange={(e) => setProductoId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+
+              setProductoId(id);
+
+              const prod = productos.find((p) => p.id === Number(id));
+
+              if (prod) {
+                setPrecio(prod.precio_venta);
+              } else {
+                setPrecio("");
+              }
+            }}
           >
             <option value="">Seleccione un producto</option>
 
@@ -147,6 +180,22 @@ function Facturas() {
             onChange={(e) => setCantidad(e.target.value)}
           />
 
+          <input
+            type="number"
+            className="form-control mb-2"
+            placeholder="Precio"
+            value={precio}
+            onChange={(e) => setPrecio(e.target.value)}
+          />
+
+          <input
+            type="number"
+            className="form-control mb-3"
+            placeholder="Descuento"
+            value={descuento}
+            onChange={(e) => setDescuento(e.target.value)}
+          />
+
           <button className="btn btn-primary" onClick={agregarProducto}>
             Agregar Producto
           </button>
@@ -156,24 +205,57 @@ function Facturas() {
           <thead>
             <tr>
               <th>Producto</th>
-              <th>Precio</th>
-              <th>Cantidad</th>
-              <th>Subtotal</th>
+              <th className="text-end">Precio</th>
+              <th className="text-center">Cantidad</th>
+              <th className="text-end">Descuento</th>
+              <th className="text-end">Subtotal</th>
+              <th width="80" className="text-center">
+                Acción
+              </th>
             </tr>
           </thead>
 
           <tbody>
-            {detalle.map((item, index) => (
-              <tr key={index}>
-                <td>{item.nombre}</td>
-
-                <td>${item.precio}</td>
-
-                <td>{item.cantidad}</td>
-
-                <td>${(item.precio * item.cantidad).toFixed(2)}</td>
+            {detalle.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="text-center">
+                  No hay productos agregados.
+                </td>
               </tr>
-            ))}
+            ) : (
+              detalle.map((item, index) => (
+                <tr key={index}>
+                  <td>{item.nombre}</td>
+
+                  <td className="text-end">
+                    RD$ {Number(item.precio).toLocaleString("es-DO")}
+                  </td>
+
+                  <td className="text-center">{item.cantidad}</td>
+
+                  <td className="text-end">
+                    RD$ {Number(item.descuento).toLocaleString("es-DO")}
+                  </td>
+
+                  <td className="text-end">
+                    RD${" "}
+                    {(
+                      item.precio * item.cantidad -
+                      item.descuento
+                    ).toLocaleString("es-DO")}
+                  </td>
+
+                  <td className="text-center">
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => eliminarItem(index)}
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 
