@@ -10,6 +10,7 @@ const usuariosRoutes = require("./routes/usuarios");
 const configuracionRoutes = require("./routes/configuracion");
 const facturasRoutes = require("./routes/facturas");
 const dashboardRoutes = require("./routes/dashboard");
+const categoriasRoutes = require("./routes/categorias");
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use("/api/usuarios", usuariosRoutes);
 app.use("/api/configuracion", configuracionRoutes);
 app.use("/api/facturas", facturasRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/categorias", categoriasRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Sistema de Facturación");

@@ -18,10 +18,10 @@ router.post("/", validarToken, async (req, res) => {
     for (const item of productos) {
       const producto = await client.query(
         `
-        SELECT *
-        FROM productos
-        WHERE id = $1
-        `,
+    SELECT id, nombre, stock
+    FROM productos
+    WHERE id = $1
+    `,
         [item.producto_id],
       );
 
@@ -29,9 +29,17 @@ router.post("/", validarToken, async (req, res) => {
         throw new Error("Producto no encontrado");
       }
 
-      const precio = Number(producto.rows[0].precio);
+      if (
+        producto.rows[0].tipo === "PRODUCTO" &&
+        Number(producto.rows[0].stock) < Number(item.cantidad)
+      ) {
+        throw new Error(`Stock insuficiente para ${producto.rows[0].nombre}`);
+      }
 
-      total += precio * Number(item.cantidad);
+      const precio = Number(item.precio);
+      const descuento = Number(item.descuento || 0);
+
+      total += precio * Number(item.cantidad) - descuento;
     }
 
     const facturaResult = await client.query(
@@ -65,30 +73,38 @@ router.post("/", validarToken, async (req, res) => {
         [item.producto_id],
       );
 
-      const precio = producto.rows[0].precio;
-
+      const precio = Number(item.precio);
       await client.query(
         `
-        INSERT INTO factura_detalle
-        (
-          factura_id,
-          producto_id,
-          cantidad,
-          precio
-        )
-        VALUES ($1,$2,$3,$4)
-        `,
-        [facturaId, item.producto_id, item.cantidad, precio],
+  INSERT INTO factura_detalle
+  (
+    factura_id,
+    producto_id,
+    cantidad,
+    precio,
+    descuento
+  )
+  VALUES ($1,$2,$3,$4,$5)
+  `,
+        [
+          facturaId,
+          item.producto_id,
+          item.cantidad,
+          precio,
+          Number(item.descuento || 0),
+        ],
       );
 
-      await client.query(
-        `
-        UPDATE productos
-        SET stock = stock - $1
-        WHERE id = $2
-        `,
-        [item.cantidad, item.producto_id],
-      );
+      if (producto.rows[0].tipo === "PRODUCTO") {
+        await client.query(
+          `
+    UPDATE productos
+    SET stock = stock - $1
+    WHERE id = $2
+    `,
+          [item.cantidad, item.producto_id],
+        );
+      }
     }
 
     await client.query("COMMIT");
@@ -165,7 +181,8 @@ router.get("/:id", validarToken, async (req, res) => {
         p.nombre,
         fd.cantidad,
         fd.precio,
-        (fd.cantidad * fd.precio) AS subtotal
+fd.descuento,
+(fd.cantidad * fd.precio) - fd.descuento AS subtotal
       FROM factura_detalle fd
       INNER JOIN productos p
         ON p.id = fd.producto_id

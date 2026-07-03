@@ -6,49 +6,58 @@ const validarToken = require("../middleware/auth");
 
 router.get("/", validarToken, async (req, res) => {
   try {
-    const { periodo = "dia" } = req.query;
+    const hoy = new Date().toISOString().split("T")[0];
 
-    let filtroFecha = "";
+    const primerDiaMes = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      1,
+    )
+      .toISOString()
+      .split("T")[0];
 
-    switch (periodo) {
-      case "dia":
-        filtroFecha = "DATE(fecha) = CURRENT_DATE";
-        break;
-
-      case "semana":
-        filtroFecha = "fecha >= CURRENT_DATE - INTERVAL '7 days'";
-        break;
-
-      case "mes":
-        filtroFecha =
-          "DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)";
-        break;
-
-      case "anio":
-        filtroFecha =
-          "DATE_TRUNC('year', fecha) = DATE_TRUNC('year', CURRENT_DATE)";
-        break;
-
-      default:
-        filtroFecha = "DATE(fecha) = CURRENT_DATE";
-    }
+    const { desde = primerDiaMes, hasta = hoy } = req.query;
 
     const productos = await pool.query(`SELECT COUNT(*) total FROM productos`);
 
     const clientes = await pool.query(`SELECT COUNT(*) total FROM clientes`);
 
-    const facturas = await pool.query(`
-      SELECT COUNT(*) total
-      FROM facturas
-      WHERE ${filtroFecha}
-    `);
+    const facturas = await pool.query(
+      `
+  SELECT COUNT(*) total
+  FROM facturas
+  WHERE DATE(fecha) BETWEEN $1 AND $2
+`,
+      [desde, hasta],
+    );
+    const ventas = await pool.query(
+      `
+  SELECT COALESCE(SUM(total),0) total
+  FROM facturas
+  WHERE DATE(fecha) BETWEEN $1 AND $2
+`,
+      [desde, hasta],
+    );
 
-    const ventas = await pool.query(`
-      SELECT COALESCE(SUM(total),0) total
-      FROM facturas
-      WHERE ${filtroFecha}
-    `);
-
+    const ganancias = await pool.query(
+      `
+  SELECT
+    COALESCE(
+      SUM(
+        (fd.precio - p.costo_compra) * fd.cantidad
+        - COALESCE(fd.descuento,0)
+      ),
+      0
+    ) AS total
+  FROM factura_detalle fd
+  INNER JOIN facturas f
+      ON f.id = fd.factura_id
+  INNER JOIN productos p
+      ON p.id = fd.producto_id
+  WHERE DATE(f.fecha) BETWEEN $1 AND $2
+`,
+      [desde, hasta],
+    );
     const ultimasFacturas = await pool.query(`
       SELECT
         f.id,
@@ -68,6 +77,7 @@ router.get("/", validarToken, async (req, res) => {
       facturas: Number(facturas.rows[0].total),
       ventas: Number(ventas.rows[0].total),
       ultimasFacturas: ultimasFacturas.rows,
+      ganancias: Number(ganancias.rows[0].total),
     });
   } catch (error) {
     console.error(error);
