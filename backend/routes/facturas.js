@@ -11,17 +11,35 @@ router.post("/", validarToken, async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const { cliente_id, productos } = req.body;
+    const { cliente_id, productos, forma_pago = "EFECTIVO" } = req.body;
+
+    // Buscar caja abierta
+    const caja = await client.query(
+      `
+      SELECT id
+      FROM cajas
+      WHERE usuario_id = $1
+      AND estado = 'ABIERTA'
+      LIMIT 1
+      `,
+      [req.usuario.id],
+    );
+
+    if (caja.rows.length === 0) {
+      throw new Error("Debe abrir una caja antes de facturar.");
+    }
+
+    const cajaId = caja.rows[0].id;
 
     let total = 0;
 
     for (const item of productos) {
       const producto = await client.query(
         `
-    SELECT id, nombre, stock
-    FROM productos
-    WHERE id = $1
-    `,
+        SELECT *
+        FROM productos
+        WHERE id = $1
+        `,
         [item.producto_id],
       );
 
@@ -48,17 +66,21 @@ router.post("/", validarToken, async (req, res) => {
       (
         cliente_id,
         fecha,
-        total
+        total,
+        caja_id,
+        forma_pago
       )
       VALUES
       (
         $1,
         NOW(),
-        $2
+        $2,
+        $3,
+        $4
       )
       RETURNING id
       `,
-      [cliente_id, total],
+      [cliente_id, total, cajaId, forma_pago],
     );
 
     const facturaId = facturaResult.rows[0].id;
@@ -74,18 +96,19 @@ router.post("/", validarToken, async (req, res) => {
       );
 
       const precio = Number(item.precio);
+
       await client.query(
         `
-  INSERT INTO factura_detalle
-  (
-    factura_id,
-    producto_id,
-    cantidad,
-    precio,
-    descuento
-  )
-  VALUES ($1,$2,$3,$4,$5)
-  `,
+        INSERT INTO factura_detalle
+        (
+          factura_id,
+          producto_id,
+          cantidad,
+          precio,
+          descuento
+        )
+        VALUES ($1,$2,$3,$4,$5)
+        `,
         [
           facturaId,
           item.producto_id,
@@ -98,13 +121,49 @@ router.post("/", validarToken, async (req, res) => {
       if (producto.rows[0].tipo === "PRODUCTO") {
         await client.query(
           `
-    UPDATE productos
-    SET stock = stock - $1
-    WHERE id = $2
-    `,
+          UPDATE productos
+          SET stock = stock - $1
+          WHERE id = $2
+          `,
           [item.cantidad, item.producto_id],
         );
       }
+    }
+
+    // Actualizar caja según forma de pago
+    switch (forma_pago) {
+      case "EFECTIVO":
+        await client.query(
+          `
+          UPDATE cajas
+          SET efectivo = efectivo + $1
+          WHERE id = $2
+          `,
+          [total, cajaId],
+        );
+        break;
+
+      case "TARJETA":
+        await client.query(
+          `
+          UPDATE cajas
+          SET tarjeta = tarjeta + $1
+          WHERE id = $2
+          `,
+          [total, cajaId],
+        );
+        break;
+
+      case "TRANSFERENCIA":
+        await client.query(
+          `
+          UPDATE cajas
+          SET transferencia = transferencia + $1
+          WHERE id = $2
+          `,
+          [total, cajaId],
+        );
+        break;
     }
 
     await client.query("COMMIT");

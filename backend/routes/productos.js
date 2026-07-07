@@ -146,6 +146,7 @@ router.put("/:id", validarToken, async (req, res) => {
       costo_compra,
       precio_venta,
       stock,
+      tipo,
     } = req.body;
 
     // Validaciones
