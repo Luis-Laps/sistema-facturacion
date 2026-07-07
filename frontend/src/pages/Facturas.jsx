@@ -15,6 +15,8 @@ function Facturas() {
   const [precio, setPrecio] = useState("");
   const [descuento, setDescuento] = useState(0);
 
+  const [formaPago, setFormaPago] = useState("EFECTIVO");
+
   const [detalle, setDetalle] = useState([]);
 
   const cargarDatos = async () => {
@@ -93,11 +95,10 @@ function Facturas() {
 
       const response = await api.post("/facturas", {
         cliente_id: Number(clienteId),
+        forma_pago: formaPago,
         productos: detalle.map((item) => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,
-          precio: item.precio,
-          descuento: item.descuento,
         })),
       });
 
@@ -143,6 +144,22 @@ function Facturas() {
               </option>
             ))}
           </select>
+
+          <div className="mb-3">
+            <label className="form-label">Forma de Pago</label>
+
+            <select
+              className="form-control"
+              value={formaPago}
+              onChange={(e) => setFormaPago(e.target.value)}
+            >
+              <option value="EFECTIVO">💵 Efectivo</option>
+
+              <option value="TARJETA">💳 Tarjeta</option>
+
+              <option value="TRANSFERENCIA">🏦 Transferencia</option>
+            </select>
+          </div>
 
           <h5>Agregar Producto</h5>
 
