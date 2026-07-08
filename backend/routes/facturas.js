@@ -13,6 +13,12 @@ router.post("/", validarToken, async (req, res) => {
 
     const { cliente_id, productos, forma_pago = "EFECTIVO" } = req.body;
 
+    const formasPermitidas = ["EFECTIVO", "TARJETA", "TRANSFERENCIA"];
+
+    if (!formasPermitidas.includes(forma_pago)) {
+      throw new Error("Forma de pago inválida.");
+    }
+
     // Buscar caja abierta
     const caja = await client.query(
       `
@@ -54,14 +60,50 @@ router.post("/", validarToken, async (req, res) => {
         throw new Error(`Stock insuficiente para ${producto.rows[0].nombre}`);
       }
 
-      const precio = Number(item.precio);
+      const precio = Number(producto.rows[0].precio_venta);
       const descuento = Number(item.descuento || 0);
+
+      if (Number.isNaN(precio)) {
+        throw new Error(
+          `El producto "${producto.rows[0].nombre}" tiene un precio de venta inválido.`,
+        );
+      }
+
+      if (Number.isNaN(Number(item.cantidad))) {
+        throw new Error(
+          `Cantidad inválida para el producto "${producto.rows[0].nombre}".`,
+        );
+      }
+
+      console.log({
+        producto: producto.rows[0].nombre,
+        precio,
+        cantidad: item.cantidad,
+        descuento,
+        subtotal: precio * Number(item.cantidad) - descuento,
+      });
 
       total += precio * Number(item.cantidad) - descuento;
     }
 
+    console.log("================================");
+    console.log("Productos:", productos);
+    console.log("Total calculado:", total);
+    console.log("Tipo de total:", typeof total);
+    console.log("¿Es NaN?", Number.isNaN(total));
+    console.log("================================");
+
+    if (Number.isNaN(total)) {
+      throw new Error("No fue posible calcular el total de la factura.");
+    }
+
+    if (total < 0) {
+      throw new Error("El total de la factura no puede ser negativo.");
+    }
+
     const facturaResult = await client.query(
       `
+      
       INSERT INTO facturas
       (
         cliente_id,
@@ -88,27 +130,34 @@ router.post("/", validarToken, async (req, res) => {
     for (const item of productos) {
       const producto = await client.query(
         `
-        SELECT *
-        FROM productos
-        WHERE id = $1
-        `,
+    SELECT *
+    FROM productos
+    WHERE id = $1
+    `,
         [item.producto_id],
       );
 
-      const precio = Number(item.precio);
+      const precio = Number(producto.rows[0].precio_venta);
+
+      // ✅ Validación
+      if (Number.isNaN(precio)) {
+        throw new Error(
+          `Precio inválido para el producto "${producto.rows[0].nombre}".`,
+        );
+      }
 
       await client.query(
         `
-        INSERT INTO factura_detalle
-        (
-          factura_id,
-          producto_id,
-          cantidad,
-          precio,
-          descuento
-        )
-        VALUES ($1,$2,$3,$4,$5)
-        `,
+    INSERT INTO factura_detalle
+    (
+      factura_id,
+      producto_id,
+      cantidad,
+      precio,
+      descuento
+    )
+    VALUES ($1,$2,$3,$4,$5)
+    `,
         [
           facturaId,
           item.producto_id,
@@ -121,10 +170,10 @@ router.post("/", validarToken, async (req, res) => {
       if (producto.rows[0].tipo === "PRODUCTO") {
         await client.query(
           `
-          UPDATE productos
-          SET stock = stock - $1
-          WHERE id = $2
-          `,
+      UPDATE productos
+      SET stock = stock - $1
+      WHERE id = $2
+      `,
           [item.cantidad, item.producto_id],
         );
       }
