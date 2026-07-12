@@ -9,25 +9,72 @@ const validarToken = require("../middleware/auth");
 // ==========================================
 router.get("/", validarToken, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT
-          p.id,
-          p.codigo,
-          p.nombre,
-          p.descripcion,
-          p.costo_compra,
-          p.precio_venta,
-          p.stock,
-          p.tipo,
-          p.categoria_id,
-          c.nombre AS categoria
-      FROM productos p
-      LEFT JOIN categorias c
-          ON c.id = p.categoria_id
-      ORDER BY p.id DESC
-    `);
+    const { page = 1, limit = 10, buscar = "" } = req.query;
+    const pagina = Number(page);
+    const limite = Number(limit);
+    const offset = (pagina - 1) * limite;
 
-    res.json(result.rows);
+    const result = await pool.query(
+      `
+  SELECT
+      p.id,
+      p.codigo,
+      p.nombre,
+      p.descripcion,
+      p.costo_compra,
+      p.precio_venta,
+      p.stock,
+      p.tipo,
+      p.categoria_id,
+      c.nombre AS categoria
+
+  FROM productos p
+
+  LEFT JOIN categorias c
+      ON c.id = p.categoria_id
+
+  WHERE
+      p.activo = TRUE
+  AND
+  (
+      p.nombre ILIKE $1
+      OR p.codigo ILIKE $1
+      OR c.nombre ILIKE $1
+  )
+
+  ORDER BY p.id DESC
+
+  LIMIT $2
+  OFFSET $3
+  `,
+      [`%${buscar}%`, limite, offset],
+    );
+
+    const total = await pool.query(
+      `
+  SELECT COUNT(*) total
+  FROM productos p
+  LEFT JOIN categorias c
+    ON c.id = p.categoria_id
+
+  WHERE
+      p.activo = TRUE
+  AND
+  (
+      p.nombre ILIKE $1
+      OR p.codigo ILIKE $1
+      OR c.nombre ILIKE $1
+  )
+  `,
+      [`%${buscar}%`],
+    );
+
+    res.json({
+      data: result.rows,
+      total: Number(total.rows[0].total),
+      page: pagina,
+      totalPages: Math.ceil(Number(total.rows[0].total) / limite),
+    });
   } catch (error) {
     console.error(error);
 

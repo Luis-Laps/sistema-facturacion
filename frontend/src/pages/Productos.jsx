@@ -3,7 +3,24 @@ import Swal from "sweetalert2";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 
+const crearProductoVacio = () => ({
+  codigo: "",
+  nombre: "",
+  categoria_id: "",
+  descripcion: "",
+  costo_compra: 0,
+  porcentaje_ganancia: 30,
+  precio_venta: 0,
+  stock: 0,
+  tipo: "PRODUCTO",
+});
+
 function Productos() {
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProductos, setTotalProductos] = useState(0);
+
+  const limite = 10;
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
@@ -13,32 +30,19 @@ function Productos() {
   const [editando, setEditando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
 
-  const crearProductoVacio = () => ({
-    codigo: `ART-${Date.now().toString().slice(-6)}`,
-    nombre: "",
-    categoria_id: "",
-    descripcion: "",
-    costo_compra: "",
-    porcentaje_ganancia: 30,
-    precio_venta: "",
-    stock: "",
-    tipo: "PRODUCTO",
-  });
-
-  const [producto, setProducto] = useState(crearProductoVacio());
-
-  // ==========================
-  // CARGAR PRODUCTOS
-  // ==========================
-
   const cargarProductos = async () => {
     try {
-      const response = await api.get("/productos");
-      setProductos(response.data);
+      const response = await api.get(`/productos?page=${page}&limit=${limite}`);
+
+      setProductos(response.data.data);
+      setTotalPages(response.data.totalPages);
+      setTotalProductos(response.data.total);
     } catch (error) {
       console.error(error);
     }
   };
+
+  const [producto, setProducto] = useState(crearProductoVacio());
 
   // ==========================
   // CARGAR CATEGORIAS
@@ -232,7 +236,7 @@ function Productos() {
   useEffect(() => {
     cargarProductos();
     cargarCategorias();
-  }, []);
+  }, [page]);
   return (
     <>
       <Navbar />
@@ -241,7 +245,7 @@ function Productos() {
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h2>Productos</h2>
-            <small className="text-muted">Total: {productos.length}</small>
+            <small className="text-muted">Total: {totalProductos}</small>
           </div>
 
           <button className="btn btn-success" onClick={nuevoProducto}>
@@ -328,7 +332,37 @@ function Productos() {
             </table>
           </div>
         </div>
+        <div className="d-flex justify-content-between align-items-center mt-3">
+          <small className="text-muted">
+            Mostrando {totalProductos === 0 ? 0 : (page - 1) * limite + 1}
+            {" - "}
+            {Math.min(page * limite, totalProductos)}
+            {" de "}
+            {totalProductos} productos
+          </small>
 
+          <div>
+            <button
+              className="btn btn-outline-primary me-2"
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
+              ← Anterior
+            </button>
+
+            <span className="mx-3 fw-bold">
+              Página {page} de {totalPages}
+            </span>
+
+            <button
+              className="btn btn-outline-primary"
+              disabled={page === totalPages}
+              onClick={() => setPage(page + 1)}
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
         {/* MODAL */}
 
         {mostrarModal && (

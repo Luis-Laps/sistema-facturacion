@@ -40,18 +40,36 @@ router.post("/", validarToken, async (req, res) => {
     let total = 0;
 
     for (const item of productos) {
+      // ===========================
+      // SERVICIO
+      // ===========================
+
+      if (item.tipo === "SERVICIO") {
+        const precio = Number(item.precio);
+        const costo = Number(item.costo || 0);
+        const descuento = Number(item.descuento || 0);
+
+        if (Number.isNaN(precio)) throw new Error("Precio inválido.");
+
+        total += precio * Number(item.cantidad) - descuento;
+
+        continue;
+      }
+
+      // ===========================
+      // PRODUCTO
+      // ===========================
+
       const producto = await client.query(
         `
-        SELECT *
-        FROM productos
-        WHERE id = $1
-        `,
+    SELECT *
+    FROM productos
+    WHERE id = $1
+    `,
         [item.producto_id],
       );
 
-      if (producto.rows.length === 0) {
-        throw new Error("Producto no encontrado");
-      }
+      if (producto.rows.length === 0) throw new Error("Producto no encontrado");
 
       if (
         producto.rows[0].tipo === "PRODUCTO" &&
@@ -62,26 +80,6 @@ router.post("/", validarToken, async (req, res) => {
 
       const precio = Number(producto.rows[0].precio_venta);
       const descuento = Number(item.descuento || 0);
-
-      if (Number.isNaN(precio)) {
-        throw new Error(
-          `El producto "${producto.rows[0].nombre}" tiene un precio de venta inválido.`,
-        );
-      }
-
-      if (Number.isNaN(Number(item.cantidad))) {
-        throw new Error(
-          `Cantidad inválida para el producto "${producto.rows[0].nombre}".`,
-        );
-      }
-
-      console.log({
-        producto: producto.rows[0].nombre,
-        precio,
-        cantidad: item.cantidad,
-        descuento,
-        subtotal: precio * Number(item.cantidad) - descuento,
-      });
 
       total += precio * Number(item.cantidad) - descuento;
     }
@@ -128,6 +126,53 @@ router.post("/", validarToken, async (req, res) => {
     const facturaId = facturaResult.rows[0].id;
 
     for (const item of productos) {
+      // ====================================
+      // SERVICIO
+      // ====================================
+
+      if (item.tipo === "SERVICIO") {
+        await client.query(
+          `
+      INSERT INTO factura_detalle
+      (
+        factura_id,
+        producto_id,
+        cantidad,
+        precio,
+        descuento,
+        es_servicio,
+        descripcion_manual,
+        costo_manual
+      )
+      VALUES
+      (
+        $1,
+        NULL,
+        $2,
+        $3,
+        $4,
+        TRUE,
+        $5,
+        $6
+      )
+      `,
+          [
+            facturaId,
+            item.cantidad,
+            Number(item.precio),
+            Number(item.descuento || 0),
+            item.descripcion,
+            Number(item.costo || 0),
+          ],
+        );
+
+        continue;
+      }
+
+      // ====================================
+      // PRODUCTO
+      // ====================================
+
       const producto = await client.query(
         `
     SELECT *
@@ -139,7 +184,6 @@ router.post("/", validarToken, async (req, res) => {
 
       const precio = Number(producto.rows[0].precio_venta);
 
-      // ✅ Validación
       if (Number.isNaN(precio)) {
         throw new Error(
           `Precio inválido para el producto "${producto.rows[0].nombre}".`,
@@ -285,16 +329,34 @@ router.get("/:id", validarToken, async (req, res) => {
 
     const detalleResult = await pool.query(
       `
-      SELECT
-        p.nombre,
-        fd.cantidad,
-        fd.precio,
-fd.descuento,
-(fd.cantidad * fd.precio) - fd.descuento AS subtotal
-      FROM factura_detalle fd
-      INNER JOIN productos p
-        ON p.id = fd.producto_id
-      WHERE fd.factura_id = $1
+    SELECT
+    CASE
+        WHEN fd.es_servicio
+            THEN fd.descripcion_manual
+        ELSE
+            p.nombre
+    END AS nombre,
+
+    fd.es_servicio,
+
+    fd.cantidad,
+
+    fd.precio,
+
+    fd.descuento,
+
+    fd.costo_manual,
+
+    (
+        fd.cantidad * fd.precio
+    ) - COALESCE(fd.descuento,0) AS subtotal
+
+FROM factura_detalle fd
+
+LEFT JOIN productos p
+    ON p.id = fd.producto_id
+
+WHERE fd.factura_id = $1
       `,
       [id],
     );

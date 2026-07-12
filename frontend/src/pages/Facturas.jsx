@@ -18,6 +18,15 @@ function Facturas() {
   const [formaPago, setFormaPago] = useState("EFECTIVO");
 
   const [detalle, setDetalle] = useState([]);
+  const [mostrarModalServicio, setMostrarModalServicio] = useState(false);
+
+  const [servicio, setServicio] = useState({
+    descripcion: "",
+    costo: "",
+    precio: "",
+    cantidad: 1,
+    descuento: 0,
+  });
 
   const cargarDatos = async () => {
     try {
@@ -56,11 +65,13 @@ function Facturas() {
     if (!producto) return;
 
     const item = {
+      tipo: "PRODUCTO",
       producto_id: producto.id,
-      nombre: producto.nombre,
-      precio: Number(precio),
+      descripcion: producto.nombre,
+      costo: Number(producto.costo_compra),
+      precio: Number(producto.precio_venta),
       cantidad: Number(cantidad),
-      descuento: Number(descuento),
+      descuento: Number(descuento || 0),
     };
 
     setDetalle((anterior) => [...anterior, item]);
@@ -70,6 +81,40 @@ function Facturas() {
     setCantidad(1);
     setPrecio("");
     setDescuento(0);
+  };
+
+  const agregarServicio = () => {
+    if (!servicio.descripcion.trim()) {
+      alert("Debe escribir una descripción del servicio.");
+      return;
+    }
+
+    if (!servicio.precio || Number(servicio.precio) <= 0) {
+      alert("Debe indicar el precio del servicio.");
+      return;
+    }
+
+    const item = {
+      tipo: "SERVICIO",
+      producto_id: null,
+      descripcion: servicio.descripcion,
+      costo: Number(servicio.costo),
+      precio: Number(servicio.precio),
+      cantidad: Number(servicio.cantidad),
+      descuento: Number(servicio.descuento),
+    };
+
+    setDetalle([...detalle, item]);
+
+    setServicio({
+      descripcion: "",
+      costo: "",
+      precio: "",
+      cantidad: 1,
+      descuento: 0,
+    });
+
+    setMostrarModalServicio(false);
   };
   const eliminarItem = (index) => {
     setDetalle(detalle.filter((_, i) => i !== index));
@@ -96,9 +141,15 @@ function Facturas() {
       const response = await api.post("/facturas", {
         cliente_id: Number(clienteId),
         forma_pago: formaPago,
+
         productos: detalle.map((item) => ({
+          tipo: item.tipo,
           producto_id: item.producto_id,
+          descripcion: item.descripcion,
+          costo: item.costo,
+          precio: item.precio,
           cantidad: item.cantidad,
+          descuento: item.descuento,
         })),
       });
 
@@ -217,6 +268,18 @@ function Facturas() {
             Agregar Producto
           </button>
         </div>
+        <div className="d-flex gap-2 mt-2">
+          <button className="btn btn-primary" onClick={agregarProducto}>
+            Agregar Producto
+          </button>
+
+          <button
+            className="btn btn-warning text-white"
+            onClick={() => setMostrarModalServicio(true)}
+          >
+            🛠 Agregar Servicio
+          </button>
+        </div>
 
         <table className="table table-bordered">
           <thead>
@@ -242,7 +305,10 @@ function Facturas() {
             ) : (
               detalle.map((item, index) => (
                 <tr key={index}>
-                  <td>{item.nombre}</td>
+                  <td>
+                    {item.tipo === "SERVICIO" ? "🛠 " : "📦 "}
+                    {item.descripcion}
+                  </td>
 
                   <td className="text-end">
                     RD$ {Number(item.precio).toLocaleString("es-DO")}
@@ -282,6 +348,146 @@ function Facturas() {
           Facturar
         </button>
       </div>
+      {mostrarModalServicio && (
+        <div
+          className="modal fade show"
+          style={{
+            display: "block",
+            backgroundColor: "rgba(0,0,0,.5)",
+          }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning text-white">
+                <h5 className="modal-title">🛠 Nuevo Servicio</h5>
+
+                <button
+                  className="btn-close"
+                  onClick={() => setMostrarModalServicio(false)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label">Descripción</label>
+
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={servicio.descripcion}
+                    onChange={(e) =>
+                      setServicio({
+                        ...servicio,
+                        descripcion: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="row">
+                  <div className="col-md-6">
+                    <label>Costo / Inversión</label>
+
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={servicio.costo}
+                      onChange={(e) =>
+                        setServicio({
+                          ...servicio,
+                          costo: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="col-md-6">
+                    <label>Precio de Venta</label>
+
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={servicio.precio}
+                      onChange={(e) =>
+                        setServicio({
+                          ...servicio,
+                          precio: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="row mt-3">
+                  <div className="col-md-6">
+                    <label>Cantidad</label>
+
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={servicio.cantidad}
+                      onChange={(e) =>
+                        setServicio({
+                          ...servicio,
+                          cantidad: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="col-md-6">
+                    <label>Descuento</label>
+
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={servicio.descuento}
+                      onChange={(e) =>
+                        setServicio({
+                          ...servicio,
+                          descuento: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <hr />
+
+                <div className="alert alert-success text-center mt-3">
+                  <h5 className="mb-1">Ganancia Esperada</h5>
+
+                  <h2 className="fw-bold">
+                    RD${" "}
+                    {(
+                      (Number(servicio.precio || 0) -
+                        Number(servicio.costo || 0)) *
+                        Number(servicio.cantidad || 1) -
+                      Number(servicio.descuento || 0)
+                    ).toLocaleString("es-DO")}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setMostrarModalServicio(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  className="btn btn-warning text-white"
+                  onClick={agregarServicio}
+                >
+                  Agregar Servicio
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
