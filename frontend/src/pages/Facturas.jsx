@@ -31,10 +31,12 @@ function Facturas() {
   const cargarDatos = async () => {
     try {
       const clientesRes = await api.get("/clientes");
-      const productosRes = await api.get("/productos");
+
+      // Traemos todos los productos para facturar
+      const productosRes = await api.get("/productos?page=1&limit=10000");
 
       setClientes(clientesRes.data);
-      setProductos(productosRes.data);
+      setProductos(productosRes.data.data);
     } catch (error) {
       console.error(error);
     }
@@ -69,7 +71,7 @@ function Facturas() {
       producto_id: producto.id,
       descripcion: producto.nombre,
       costo: Number(producto.costo_compra),
-      precio: Number(producto.precio_venta),
+      precio: Number(precio), // ← usa el precio ingresado
       cantidad: Number(cantidad),
       descuento: Number(descuento || 0),
     };
