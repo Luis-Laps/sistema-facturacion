@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
+import Swal from "sweetalert2";
 
 function HistorialFacturas() {
   const [facturas, setFacturas] = useState([]);
@@ -28,6 +29,41 @@ function HistorialFacturas() {
       console.error(error);
 
       alert("Error al cargar factura");
+    }
+  };
+
+  const eliminarFactura = async (id) => {
+    const confirmar = await Swal.fire({
+      title: "¿Eliminar factura?",
+      text: "Esta acción devolverá el inventario y eliminará la venta.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Eliminar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#dc3545",
+    });
+
+    if (!confirmar.isConfirmed) return;
+
+    try {
+      await api.delete(`/facturas/${id}`);
+
+      Swal.fire({
+        icon: "success",
+        title: "Factura eliminada",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      cargarFacturas();
+    } catch (error) {
+      console.error(error);
+
+      Swal.fire(
+        "Error",
+        error.response?.data?.mensaje || "No se pudo eliminar la factura.",
+        "error",
+      );
     }
   };
 
@@ -65,12 +101,21 @@ function HistorialFacturas() {
                 <td>RD$ {Number(factura.total).toLocaleString()}</td>
 
                 <td>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => verDetalle(factura.id)}
-                  >
-                    Ver
-                  </button>
+                  <div className="btn-group">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => verDetalle(factura.id)}
+                    >
+                      👁 Ver
+                    </button>
+
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => eliminarFactura(factura.id)}
+                    >
+                      🗑 Eliminar
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

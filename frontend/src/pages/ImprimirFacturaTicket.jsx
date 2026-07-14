@@ -136,11 +136,7 @@ function ImprimirFacturaTicket() {
         </button>
       </div>
 
-      <Ticket titulo="ORIGINAL - CLIENTE" />
-
-      <div className="separador-ticket"></div>
-
-      <Ticket titulo="COPIA - NEGOCIO" />
+      <Ticket titulo="FACTURA" />
     </>
   );
 }
