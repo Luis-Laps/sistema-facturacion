@@ -374,4 +374,127 @@ WHERE fd.factura_id = $1
   }
 });
 
+// ==========================================
+// ELIMINAR FACTURA
+// ==========================================
+router.delete("/:id", validarToken, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { id } = req.params;
+
+    // Buscar factura
+    const factura = await client.query(
+      `
+      SELECT *
+      FROM facturas
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    if (factura.rows.length === 0) {
+      throw new Error("La factura no existe.");
+    }
+
+    const facturaActual = factura.rows[0];
+
+    // Obtener detalle
+    const detalle = await client.query(
+      `
+      SELECT *
+      FROM factura_detalle
+      WHERE factura_id = $1
+      `,
+      [id],
+    );
+
+    // Devolver inventario
+    for (const item of detalle.rows) {
+      if (item.es_servicio !== true && item.producto_id) {
+        await client.query(
+          `
+    UPDATE productos
+    SET stock = stock + $1
+    WHERE id = $2
+    `,
+          [item.cantidad, item.producto_id],
+        );
+      }
+    }
+
+    // Revertir caja
+    switch (facturaActual.forma_pago) {
+      case "EFECTIVO":
+        await client.query(
+          `
+          UPDATE cajas
+          SET efectivo = efectivo - $1
+          WHERE id = $2
+          `,
+          [facturaActual.total, facturaActual.caja_id],
+        );
+        break;
+
+      case "TARJETA":
+        await client.query(
+          `
+          UPDATE cajas
+          SET tarjeta = tarjeta - $1
+          WHERE id = $2
+          `,
+          [facturaActual.total, facturaActual.caja_id],
+        );
+        break;
+
+      case "TRANSFERENCIA":
+        await client.query(
+          `
+          UPDATE cajas
+          SET transferencia = transferencia - $1
+          WHERE id = $2
+          `,
+          [facturaActual.total, facturaActual.caja_id],
+        );
+        break;
+    }
+
+    // Eliminar detalle
+    await client.query(
+      `
+      DELETE FROM factura_detalle
+      WHERE factura_id = $1
+      `,
+      [id],
+    );
+
+    // Eliminar factura
+    await client.query(
+      `
+      DELETE FROM facturas
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      mensaje: "Factura eliminada correctamente.",
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error(error);
+
+    res.status(500).json({
+      mensaje: error.message,
+    });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
