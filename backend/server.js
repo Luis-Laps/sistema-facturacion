@@ -32,6 +32,15 @@ app.get("/", (req, res) => {
   res.send("API Sistema de Facturación");
 });
 
+// 👇 Agrega esto
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
