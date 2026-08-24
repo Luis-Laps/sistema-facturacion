@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 
@@ -16,11 +18,14 @@ const crearProductoVacio = () => ({
 });
 
 function Productos() {
+  const navigate = useNavigate();
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProductos, setTotalProductos] = useState(0);
 
   const limite = 10;
+
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
@@ -29,6 +34,12 @@ function Productos() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [editando, setEditando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+
+  const [producto, setProducto] = useState(crearProductoVacio());
+
+  // ==========================================
+  // CARGAR PRODUCTOS
+  // ==========================================
 
   const cargarProductos = async () => {
     try {
@@ -42,24 +53,23 @@ function Productos() {
     }
   };
 
-  const [producto, setProducto] = useState(crearProductoVacio());
-
-  // ==========================
-  // CARGAR CATEGORIAS
-  // ==========================
+  // ==========================================
+  // CARGAR CATEGORÍAS
+  // ==========================================
 
   const cargarCategorias = async () => {
     try {
       const response = await api.get("/categorias");
+
       setCategorias(response.data);
     } catch (error) {
       console.error(error);
     }
   };
 
-  // ==========================
+  // ==========================================
   // INPUTS
-  // ==========================
+  // ==========================================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,8 +79,8 @@ function Productos() {
       [name]: value,
     };
 
-    let costo = Number(nuevo.costo_compra) || 0;
-    let porcentaje = Number(nuevo.porcentaje_ganancia) || 0;
+    const costo = Number(nuevo.costo_compra) || 0;
+    const porcentaje = Number(nuevo.porcentaje_ganancia) || 0;
 
     if (name === "costo_compra" || name === "porcentaje_ganancia") {
       nuevo.precio_venta = (costo + costo * (porcentaje / 100)).toFixed(2);
@@ -89,9 +99,9 @@ function Productos() {
     setProducto(nuevo);
   };
 
-  // ==========================
-  // NUEVO
-  // ==========================
+  // ==========================================
+  // NUEVO PRODUCTO
+  // ==========================================
 
   const nuevoProducto = () => {
     setProducto(crearProductoVacio());
@@ -100,9 +110,9 @@ function Productos() {
     setMostrarModal(true);
   };
 
-  // ==========================
-  // GUARDAR
-  // ==========================
+  // ==========================================
+  // GUARDAR PRODUCTO
+  // ==========================================
 
   const guardarProducto = async () => {
     try {
@@ -143,7 +153,9 @@ function Productos() {
       }
 
       setMostrarModal(false);
+
       cargarProductos();
+      cargarCategorias();
     } catch (error) {
       console.error(error);
 
@@ -155,9 +167,9 @@ function Productos() {
     }
   };
 
-  // ==========================
-  // EDITAR
-  // ==========================
+  // ==========================================
+  // EDITAR PRODUCTO
+  // ==========================================
 
   const editarProducto = (item) => {
     const porcentaje =
@@ -185,9 +197,9 @@ function Productos() {
     setMostrarModal(true);
   };
 
-  // ==========================
-  // ELIMINAR
-  // ==========================
+  // ==========================================
+  // ELIMINAR PRODUCTO
+  // ==========================================
 
   const eliminarProducto = async (id, nombre) => {
     const confirmar = await Swal.fire({
@@ -219,9 +231,9 @@ function Productos() {
     }
   };
 
-  // ==========================
+  // ==========================================
   // BUSCAR
-  // ==========================
+  // ==========================================
 
   const productosFiltrados = productos.filter((p) => {
     const texto = busqueda.toLowerCase();
@@ -233,25 +245,48 @@ function Productos() {
     );
   });
 
+  // ==========================================
+  // CARGA INICIAL
+  // ==========================================
+
   useEffect(() => {
     cargarProductos();
     cargarCategorias();
   }, [page]);
+
   return (
     <>
       <Navbar />
 
       <div className="container mt-4">
+        {/* ==========================================
+            ENCABEZADO
+        ========================================== */}
+
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h2>Productos</h2>
+
             <small className="text-muted">Total: {totalProductos}</small>
           </div>
 
-          <button className="btn btn-success" onClick={nuevoProducto}>
-            + Nuevo Producto
-          </button>
+          <div className="d-flex gap-2">
+            <button
+              className="btn btn-outline-primary"
+              onClick={() => navigate("/categorias")}
+            >
+              ⚙ Categorías
+            </button>
+
+            <button className="btn btn-success" onClick={nuevoProducto}>
+              + Nuevo Producto
+            </button>
+          </div>
         </div>
+
+        {/* ==========================================
+            BUSCADOR
+        ========================================== */}
 
         <div className="card shadow-sm mb-4">
           <div className="card-body">
@@ -264,6 +299,10 @@ function Productos() {
             />
           </div>
         </div>
+
+        {/* ==========================================
+            TABLA
+        ========================================== */}
 
         <div className="card shadow-sm">
           <div className="table-responsive">
@@ -332,6 +371,11 @@ function Productos() {
             </table>
           </div>
         </div>
+
+        {/* ==========================================
+            PAGINACIÓN
+        ========================================== */}
+
         <div className="d-flex justify-content-between align-items-center mt-3">
           <small className="text-muted">
             Mostrando {totalProductos === 0 ? 0 : (page - 1) * limite + 1}
@@ -363,7 +407,10 @@ function Productos() {
             </button>
           </div>
         </div>
-        {/* MODAL */}
+
+        {/* ==========================================
+            MODAL PRODUCTO
+        ========================================== */}
 
         {mostrarModal && (
           <div
@@ -409,6 +456,8 @@ function Productos() {
                       />
                     </div>
 
+                    {/* CATEGORÍA */}
+
                     <div className="col-md-6 mb-3">
                       <label>Categoría</label>
 
@@ -427,6 +476,9 @@ function Productos() {
                         ))}
                       </select>
                     </div>
+
+                    {/* TIPO */}
+
                     <div className="col-md-6 mb-3">
                       <label>Tipo</label>
 
@@ -442,6 +494,8 @@ function Productos() {
                       </select>
                     </div>
 
+                    {/* STOCK */}
+
                     {producto.tipo === "PRODUCTO" && (
                       <div className="col-md-6 mb-3">
                         <label>Cantidad en inventario</label>
@@ -456,6 +510,8 @@ function Productos() {
                       </div>
                     )}
 
+                    {/* COSTO */}
+
                     <div className="col-md-4 mb-3">
                       <label>Costo de compra</label>
 
@@ -467,6 +523,8 @@ function Productos() {
                         onChange={handleChange}
                       />
                     </div>
+
+                    {/* GANANCIA */}
 
                     <div className="col-md-4 mb-3">
                       <label>% Ganancia</label>
@@ -480,6 +538,8 @@ function Productos() {
                       />
                     </div>
 
+                    {/* PRECIO */}
+
                     <div className="col-md-4 mb-3">
                       <label>Precio venta</label>
 
@@ -492,6 +552,8 @@ function Productos() {
                       />
                     </div>
 
+                    {/* DESCRIPCIÓN */}
+
                     <div className="col-12 mb-3">
                       <label>Descripción</label>
 
@@ -503,6 +565,8 @@ function Productos() {
                         onChange={handleChange}
                       />
                     </div>
+
+                    {/* GANANCIA POR UNIDAD */}
 
                     <div className="col-12">
                       <div className="alert alert-success">

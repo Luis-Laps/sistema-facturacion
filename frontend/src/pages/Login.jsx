@@ -1,5 +1,7 @@
 import { useState } from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import api from "../services/api";
 
 function Login() {
@@ -8,7 +10,6 @@ function Login() {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [mostrarPassword, setMostrarPassword] = useState(false);
-
   const [cargando, setCargando] = useState(false);
 
   const login = async () => {
@@ -24,7 +25,9 @@ function Login() {
 
       navigate("/dashboard");
     } catch (error) {
-      alert("Credenciales incorrectas");
+      console.error(error);
+
+      alert(error.response?.data?.mensaje || "Credenciales incorrectas");
     } finally {
       setCargando(false);
     }
@@ -35,11 +38,11 @@ function Login() {
       <div className="login-container">
         <div className="login-card">
           <div className="text-center">
-            <img src="/logo.png" alt="Logo" className="logo" />
+            <img src="/LAPS_logo_transparent.png" alt="LAPS" className="logo" />
 
-            <h2 className="titulo">Byron Reparaciones</h2>
+            <h2 className="titulo">Sistema de Facturación</h2>
 
-            <p className="subtitulo">Sistema de Facturación</p>
+            <p className="subtitulo">Ingresa tus credenciales para continuar</p>
           </div>
 
           <input
@@ -100,16 +103,14 @@ function Login() {
             padding: 40px;
             border-radius: 20px;
             box-shadow:
-              0 15px 40px rgba(
-                0,
-                0,
-                0,
-                0.25
-              );
+              0 15px 40px
+              rgba(0, 0, 0, 0.25);
           }
 
           .logo {
             width: 220px;
+            max-height: 180px;
+            object-fit: contain;
             margin-bottom: 20px;
           }
 

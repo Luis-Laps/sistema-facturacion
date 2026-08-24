@@ -40,6 +40,7 @@ router.post("/login", async (req, res) => {
         id: usuarioDB.id,
         usuario: usuarioDB.usuario,
         rol: usuarioDB.rol,
+        empresa_id: usuarioDB.empresa_id,
       },
       process.env.JWT_SECRET,
       {

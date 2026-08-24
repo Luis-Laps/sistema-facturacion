@@ -1,8 +1,14 @@
 const express = require("express");
+
 const router = express.Router();
 
 const pool = require("../db/conexion");
+
 const validarToken = require("../middleware/auth");
+
+// ==========================================
+// DASHBOARD
+// ==========================================
 
 router.get("/", validarToken, async (req, res) => {
   try {
@@ -18,69 +24,157 @@ router.get("/", validarToken, async (req, res) => {
 
     const { desde = primerDiaMes, hasta = hoy } = req.query;
 
-    const productos = await pool.query(`SELECT COUNT(*) total FROM productos`);
+    const empresaId = req.usuario.empresa_id;
 
-    const clientes = await pool.query(`SELECT COUNT(*) total FROM clientes`);
+    // ==========================================
+    // PRODUCTOS
+    // ==========================================
+
+    const productos = await pool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM productos
+      WHERE empresa_id = $1
+      AND activo = TRUE
+      `,
+      [empresaId],
+    );
+
+    // ==========================================
+    // CLIENTES
+    // ==========================================
+
+    const clientes = await pool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM clientes
+      WHERE empresa_id = $1
+      `,
+      [empresaId],
+    );
+
+    // ==========================================
+    // FACTURAS DEL PERÍODO
+    // ==========================================
 
     const facturas = await pool.query(
       `
-  SELECT COUNT(*) total
-  FROM facturas
-  WHERE DATE(fecha) BETWEEN $1 AND $2
-`,
-      [desde, hasta],
+      SELECT COUNT(*) AS total
+      FROM facturas
+      WHERE empresa_id = $1
+      AND DATE(fecha) BETWEEN $2 AND $3
+      `,
+      [empresaId, desde, hasta],
     );
+
+    // ==========================================
+    // VENTAS DEL PERÍODO
+    // ==========================================
+
     const ventas = await pool.query(
       `
-  SELECT COALESCE(SUM(total),0) total
-  FROM facturas
-  WHERE DATE(fecha) BETWEEN $1 AND $2
-`,
-      [desde, hasta],
+      SELECT COALESCE(SUM(total), 0) AS total
+      FROM facturas
+      WHERE empresa_id = $1
+      AND DATE(fecha) BETWEEN $2 AND $3
+      `,
+      [empresaId, desde, hasta],
     );
+
+    // ==========================================
+    // GANANCIAS DEL PERÍODO
+    // ==========================================
 
     const ganancias = await pool.query(
       `
-  SELECT
-    COALESCE(
-      SUM(
-        (fd.precio - p.costo_compra) * fd.cantidad
-        - COALESCE(fd.descuento,0)
-      ),
-      0
-    ) AS total
-  FROM factura_detalle fd
-  INNER JOIN facturas f
-      ON f.id = fd.factura_id
-  INNER JOIN productos p
-      ON p.id = fd.producto_id
-  WHERE DATE(f.fecha) BETWEEN $1 AND $2
-`,
-      [desde, hasta],
+      SELECT
+        COALESCE(
+          SUM(
+            CASE
+              WHEN fd.es_servicio = TRUE THEN
+                (
+                  fd.precio * fd.cantidad
+                )
+                - COALESCE(fd.descuento, 0)
+                - (
+                  COALESCE(fd.costo_manual, 0)
+                  * fd.cantidad
+                )
+
+              ELSE
+                (
+                  fd.precio * fd.cantidad
+                )
+                - COALESCE(fd.descuento, 0)
+                - (
+                  COALESCE(p.costo_compra, 0)
+                  * fd.cantidad
+                )
+            END
+          ),
+          0
+        ) AS total
+
+      FROM factura_detalle fd
+
+      INNER JOIN facturas f
+        ON f.id = fd.factura_id
+
+      LEFT JOIN productos p
+        ON p.id = fd.producto_id
+        AND p.empresa_id = $1
+
+      WHERE f.empresa_id = $1
+      AND DATE(f.fecha) BETWEEN $2 AND $3
+      `,
+      [empresaId, desde, hasta],
     );
-    const ultimasFacturas = await pool.query(`
+
+    // ==========================================
+    // ÚLTIMAS FACTURAS
+    // ==========================================
+
+    const ultimasFacturas = await pool.query(
+      `
       SELECT
         f.id,
         f.fecha,
         f.total,
         c.nombre AS cliente
       FROM facturas f
+
       INNER JOIN clientes c
         ON c.id = f.cliente_id
+        AND c.empresa_id = f.empresa_id
+
+      WHERE f.empresa_id = $1
+
       ORDER BY f.id DESC
+
       LIMIT 10
-    `);
+      `,
+      [empresaId],
+    );
+
+    // ==========================================
+    // RESPUESTA
+    // ==========================================
 
     res.json({
       productos: Number(productos.rows[0].total),
+
       clientes: Number(clientes.rows[0].total),
+
       facturas: Number(facturas.rows[0].total),
+
       ventas: Number(ventas.rows[0].total),
-      ultimasFacturas: ultimasFacturas.rows,
+
       ganancias: Number(ganancias.rows[0].total),
+
+      ultimasFacturas: ultimasFacturas.rows,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error en dashboard:", error);
 
     res.status(500).json({
       mensaje: "Error al cargar dashboard",

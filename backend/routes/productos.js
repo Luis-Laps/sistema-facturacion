@@ -1,79 +1,81 @@
 const express = require("express");
+
 const router = express.Router();
 
 const pool = require("../db/conexion");
+
 const validarToken = require("../middleware/auth");
 
 // ==========================================
 // LISTAR PRODUCTOS
 // ==========================================
+
 router.get("/", validarToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, buscar = "" } = req.query;
+
     const pagina = Number(page);
     const limite = Number(limit);
     const offset = (pagina - 1) * limite;
 
     const result = await pool.query(
       `
-  SELECT
-      p.id,
-      p.codigo,
-      p.nombre,
-      p.descripcion,
-      p.costo_compra,
-      p.precio_venta,
-      p.stock,
-      p.tipo,
-      p.categoria_id,
-      c.nombre AS categoria
-
-  FROM productos p
-
-  LEFT JOIN categorias c
-      ON c.id = p.categoria_id
-
-  WHERE
-      p.activo = TRUE
-  AND
-  (
-      p.nombre ILIKE $1
-      OR p.codigo ILIKE $1
-      OR c.nombre ILIKE $1
-  )
-
-  ORDER BY p.id DESC
-
-  LIMIT $2
-  OFFSET $3
-  `,
-      [`%${buscar}%`, limite, offset],
+      SELECT
+        p.id,
+        p.codigo,
+        p.nombre,
+        p.descripcion,
+        p.costo_compra,
+        p.precio_venta,
+        p.stock,
+        p.tipo,
+        p.categoria_id,
+        c.nombre AS categoria
+      FROM productos p
+      LEFT JOIN categorias c
+        ON c.id = p.categoria_id
+        AND c.empresa_id = p.empresa_id
+      WHERE
+        p.activo = TRUE
+        AND p.empresa_id = $1
+        AND (
+          p.nombre ILIKE $2
+          OR p.codigo ILIKE $2
+          OR c.nombre ILIKE $2
+        )
+      ORDER BY p.id DESC
+      LIMIT $3
+      OFFSET $4
+      `,
+      [req.usuario.empresa_id, `%${buscar}%`, limite, offset],
     );
 
     const total = await pool.query(
       `
-  SELECT COUNT(*) total
-  FROM productos p
-  LEFT JOIN categorias c
-    ON c.id = p.categoria_id
-
-  WHERE
-      p.activo = TRUE
-  AND
-  (
-      p.nombre ILIKE $1
-      OR p.codigo ILIKE $1
-      OR c.nombre ILIKE $1
-  )
-  `,
-      [`%${buscar}%`],
+      SELECT COUNT(*) total
+      FROM productos p
+      LEFT JOIN categorias c
+        ON c.id = p.categoria_id
+        AND c.empresa_id = p.empresa_id
+      WHERE
+        p.activo = TRUE
+        AND p.empresa_id = $1
+        AND (
+          p.nombre ILIKE $2
+          OR p.codigo ILIKE $2
+          OR c.nombre ILIKE $2
+        )
+      `,
+      [req.usuario.empresa_id, `%${buscar}%`],
     );
+
+    const totalRegistros = Number(total.rows[0].total);
 
     res.json({
       data: result.rows,
-      total: Number(total.rows[0].total),
+      total: totalRegistros,
       page: pagina,
-      totalPages: Math.ceil(Number(total.rows[0].total) / limite),
+      totalPages: Math.ceil(totalRegistros / limite),
     });
   } catch (error) {
     console.error(error);
@@ -87,6 +89,7 @@ router.get("/", validarToken, async (req, res) => {
 // ==========================================
 // CREAR PRODUCTO
 // ==========================================
+
 router.post("/", validarToken, async (req, res) => {
   try {
     const {
@@ -100,7 +103,6 @@ router.post("/", validarToken, async (req, res) => {
       tipo,
     } = req.body;
 
-    // Validaciones
     if (!codigo || !nombre || !categoria_id) {
       return res.status(400).json({
         mensaje: "Complete todos los campos obligatorios.",
@@ -125,35 +127,64 @@ router.post("/", validarToken, async (req, res) => {
       });
     }
 
-    // Verificar código repetido
+    // ==========================================
+    // VERIFICAR CATEGORÍA
+    // ==========================================
+
+    const categoria = await pool.query(
+      `
+      SELECT id
+      FROM categorias
+      WHERE id = $1
+      AND empresa_id = $2
+      `,
+      [categoria_id, req.usuario.empresa_id],
+    );
+
+    if (categoria.rows.length === 0) {
+      return res.status(400).json({
+        mensaje: "La categoría no pertenece a esta empresa.",
+      });
+    }
+
+    // ==========================================
+    // VERIFICAR CÓDIGO EN ESTA EMPRESA
+    // ==========================================
+
     const existe = await pool.query(
       `
       SELECT id
       FROM productos
       WHERE codigo = $1
+      AND empresa_id = $2
       `,
-      [codigo],
+      [codigo, req.usuario.empresa_id],
     );
 
     if (existe.rows.length > 0) {
       return res.status(400).json({
-        mensaje: "Ya existe un producto con ese código.",
+        mensaje: "Ya existe un producto con ese código en esta empresa.",
       });
     }
+
+    // ==========================================
+    // CREAR PRODUCTO
+    // ==========================================
 
     const result = await pool.query(
       `
       INSERT INTO productos (
-    codigo,
-    nombre,
-    descripcion,
-    categoria_id,
-    costo_compra,
-    precio_venta,
-    stock,
-    tipo
-)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        codigo,
+        nombre,
+        descripcion,
+        categoria_id,
+        costo_compra,
+        precio_venta,
+        stock,
+        tipo,
+        empresa_id
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
       `,
       [
@@ -165,6 +196,7 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         precio_venta,
         stock,
         tipo || "PRODUCTO",
+        req.usuario.empresa_id,
       ],
     );
 
@@ -181,6 +213,7 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 // ==========================================
 // ACTUALIZAR PRODUCTO
 // ==========================================
+
 router.put("/:id", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -196,7 +229,6 @@ router.put("/:id", validarToken, async (req, res) => {
       tipo,
     } = req.body;
 
-    // Validaciones
     if (!codigo || !nombre || !categoria_id) {
       return res.status(400).json({
         mensaje: "Complete todos los campos obligatorios.",
@@ -221,36 +253,67 @@ router.put("/:id", validarToken, async (req, res) => {
       });
     }
 
-    // Verificar que el código no exista en otro producto
+    // ==========================================
+    // VERIFICAR CATEGORÍA
+    // ==========================================
+
+    const categoria = await pool.query(
+      `
+      SELECT id
+      FROM categorias
+      WHERE id = $1
+      AND empresa_id = $2
+      `,
+      [categoria_id, req.usuario.empresa_id],
+    );
+
+    if (categoria.rows.length === 0) {
+      return res.status(400).json({
+        mensaje: "La categoría no pertenece a esta empresa.",
+      });
+    }
+
+    // ==========================================
+    // VERIFICAR CÓDIGO
+    // ==========================================
+
     const existe = await pool.query(
       `
       SELECT id
       FROM productos
       WHERE codigo = $1
-      AND id <> $2
+      AND empresa_id = $2
+      AND id <> $3
       `,
-      [codigo, id],
+      [codigo, req.usuario.empresa_id, id],
     );
 
     if (existe.rows.length > 0) {
       return res.status(400).json({
-        mensaje: "Ya existe otro producto con ese código.",
+        mensaje: "Ya existe otro producto con ese código en esta empresa.",
       });
     }
 
-    await pool.query(
+    // ==========================================
+    // ACTUALIZAR PRODUCTO
+    // ==========================================
+
+    const result = await pool.query(
       `
       UPDATE productos
-SET
-    codigo = $1,
-    nombre = $2,
-    descripcion = $3,
-    categoria_id = $4,
-    costo_compra = $5,
-    precio_venta = $6,
-    stock = $7,
-    tipo = $8
-WHERE id = $9
+      SET
+        codigo = $1,
+        nombre = $2,
+        descripcion = $3,
+        categoria_id = $4,
+        costo_compra = $5,
+        precio_venta = $6,
+        stock = $7,
+        tipo = $8
+      WHERE
+        id = $9
+        AND empresa_id = $10
+      RETURNING *
       `,
       [
         codigo,
@@ -262,12 +325,17 @@ WHERE id = $9
         stock,
         tipo || "PRODUCTO",
         id,
+        req.usuario.empresa_id,
       ],
     );
 
-    res.json({
-      mensaje: "Producto actualizado",
-    });
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Producto no encontrado.",
+      });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     console.error(error);
 
@@ -280,17 +348,26 @@ WHERE id = $9
 // ==========================================
 // ELIMINAR PRODUCTO
 // ==========================================
+
 router.delete("/:id", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query(
+    const result = await pool.query(
       `
-      DELETE FROM productos
-      WHERE id = $1
-      `,
-      [id],
+        DELETE FROM productos
+        WHERE id = $1
+        AND empresa_id = $2
+        RETURNING id
+        `,
+      [id, req.usuario.empresa_id],
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Producto no encontrado.",
+      });
+    }
 
     res.json({
       mensaje: "Producto eliminado",

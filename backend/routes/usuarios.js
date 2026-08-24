@@ -1,17 +1,28 @@
 const express = require("express");
+
 const router = express.Router();
 
 const pool = require("../db/conexion");
+
 const bcrypt = require("bcrypt");
+
 const validarToken = require("../middleware/auth");
+
+// ==========================================
+// LISTAR USUARIOS
+// ==========================================
 
 router.get("/", validarToken, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT id, nombre, usuario, rol, activo
       FROM usuarios
+      WHERE empresa_id = $1
       ORDER BY id DESC
-    `);
+      `,
+      [req.usuario.empresa_id],
+    );
 
     res.json(result.rows);
   } catch (error) {
@@ -22,6 +33,10 @@ router.get("/", validarToken, async (req, res) => {
     });
   }
 });
+
+// ==========================================
+// CREAR USUARIO
+// ==========================================
 
 router.post("/", validarToken, async (req, res) => {
   try {
@@ -37,12 +52,13 @@ router.post("/", validarToken, async (req, res) => {
         usuario,
         password,
         rol,
-        activo
+        activo,
+        empresa_id
       )
-      VALUES ($1,$2,$3,$4,true)
-      RETURNING id,nombre,usuario,rol
+      VALUES ($1, $2, $3, $4, true, $5)
+      RETURNING id, nombre, usuario, rol
       `,
-      [nombre, usuario, passwordHash, rol],
+      [nombre, usuario, passwordHash, rol, req.usuario.empresa_id],
     );
 
     res.status(201).json(result.rows[0]);
@@ -55,6 +71,10 @@ router.post("/", validarToken, async (req, res) => {
   }
 });
 
+// ==========================================
+// ACTUALIZAR USUARIO
+// ==========================================
+
 router.put("/:id", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -64,12 +84,14 @@ router.put("/:id", validarToken, async (req, res) => {
     await pool.query(
       `
       UPDATE usuarios
-      SET nombre = $1,
-          usuario = $2,
-          rol = $3
+      SET
+        nombre = $1,
+        usuario = $2,
+        rol = $3
       WHERE id = $4
+      AND empresa_id = $5
       `,
-      [nombre, usuario, rol, id],
+      [nombre, usuario, rol, id, req.usuario.empresa_id],
     );
 
     res.json({
@@ -84,6 +106,10 @@ router.put("/:id", validarToken, async (req, res) => {
   }
 });
 
+// ==========================================
+// ELIMINAR USUARIO
+// ==========================================
+
 router.delete("/:id", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -92,8 +118,9 @@ router.delete("/:id", validarToken, async (req, res) => {
       `
       DELETE FROM usuarios
       WHERE id = $1
+      AND empresa_id = $2
       `,
-      [id],
+      [id, req.usuario.empresa_id],
     );
 
     res.json({

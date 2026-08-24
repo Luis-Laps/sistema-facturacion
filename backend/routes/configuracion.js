@@ -1,24 +1,54 @@
 const express = require("express");
+
 const router = express.Router();
 
 const pool = require("../db/conexion");
+
 const validarToken = require("../middleware/auth");
 
-// OBTENER CONFIGURACIÓN
+// ==========================================
+// VERIFICAR ADMIN
+// ==========================================
+
+const validarAdmin = (req, res, next) => {
+  if (req.usuario.rol !== "ADMIN" && req.usuario.rol !== "SUPER_ADMIN") {
+    return res.status(403).json({
+      mensaje:
+        "No tienes permisos para modificar la configuración de la empresa.",
+    });
+  }
+
+  next();
+};
+
+// ==========================================
+// OBTENER CONFIGURACIÓN DE LA EMPRESA
+// ==========================================
+
 router.get("/", validarToken, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT *
-      FROM configuracion_empresa
-      LIMIT 1
-    `);
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        nombre,
+        rnc,
+        telefono,
+        direccion,
+        correo,
+        logo_url,
+        color_principal,
+        activo,
+        fecha_vencimiento
+      FROM empresas
+      WHERE id = $1
+      `,
+      [req.usuario.empresa_id],
+    );
 
     if (result.rows.length === 0) {
-      return res.json({
-        nombre: "",
-        telefono: "",
-        direccion: "",
-        correo: "",
+      return res.status(404).json({
+        mensaje: "Empresa no encontrada",
       });
     }
 
@@ -32,48 +62,74 @@ router.get("/", validarToken, async (req, res) => {
   }
 });
 
+// ==========================================
 // GUARDAR CONFIGURACIÓN
-router.put("/", validarToken, async (req, res) => {
+// SOLO ADMIN
+// ==========================================
+
+router.put("/", validarToken, validarAdmin, async (req, res) => {
   try {
-    const { nombre, telefono, direccion, correo } = req.body;
+    const {
+      nombre,
+      rnc,
+      telefono,
+      direccion,
+      correo,
+      logo_url,
+      color_principal,
+    } = req.body;
 
-    const existe = await pool.query(`
-      SELECT id
-      FROM configuracion_empresa
-      LIMIT 1
-    `);
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({
+        mensaje: "El nombre de la empresa es obligatorio.",
+      });
+    }
 
-    if (existe.rows.length === 0) {
-      await pool.query(
-        `
-        INSERT INTO configuracion_empresa
-        (
-          nombre,
-          telefono,
-          direccion,
-          correo
-        )
-        VALUES ($1,$2,$3,$4)
-        `,
-        [nombre, telefono, direccion, correo],
-      );
-    } else {
-      await pool.query(
-        `
-        UPDATE configuracion_empresa
+    const result = await pool.query(
+      `
+        UPDATE empresas
         SET
           nombre = $1,
-          telefono = $2,
-          direccion = $3,
-          correo = $4
-        WHERE id = $5
+          rnc = $2,
+          telefono = $3,
+          direccion = $4,
+          correo = $5,
+          logo_url = $6,
+          color_principal = $7
+        WHERE id = $8
+        RETURNING
+          id,
+          nombre,
+          rnc,
+          telefono,
+          direccion,
+          correo,
+          logo_url,
+          color_principal,
+          activo,
+          fecha_vencimiento
         `,
-        [nombre, telefono, direccion, correo, existe.rows[0].id],
-      );
+      [
+        nombre.trim(),
+        rnc || null,
+        telefono || null,
+        direccion || null,
+        correo || null,
+        logo_url || null,
+        color_principal || "#198754",
+        req.usuario.empresa_id,
+      ],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Empresa no encontrada",
+      });
     }
 
     res.json({
       mensaje: "Configuración guardada",
+      empresa: result.rows[0],
     });
   } catch (error) {
     console.error(error);

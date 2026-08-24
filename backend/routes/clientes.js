@@ -1,17 +1,33 @@
 const express = require("express");
+
 const router = express.Router();
 
 const pool = require("../db/conexion");
+
 const validarToken = require("../middleware/auth");
 
+// ==========================================
 // LISTAR CLIENTES
+// ==========================================
+
 router.get("/", validarToken, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT *
-      FROM clientes
-      ORDER BY id DESC
-    `);
+    const result = await pool.query(
+      `
+  SELECT
+    id,
+    nombre,
+    telefono,
+    email,
+    direccion,
+    empresa_id
+  FROM clientes
+  WHERE empresa_id = $1
+  AND activo = TRUE
+  ORDER BY id DESC
+  `,
+      [req.usuario.empresa_id],
+    );
 
     res.json(result.rows);
   } catch (error) {
@@ -23,10 +39,19 @@ router.get("/", validarToken, async (req, res) => {
   }
 });
 
+// ==========================================
 // CREAR CLIENTE
+// ==========================================
+
 router.post("/", validarToken, async (req, res) => {
   try {
     const { nombre, telefono, email, direccion } = req.body;
+
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({
+        mensaje: "El nombre del cliente es obligatorio.",
+      });
+    }
 
     const result = await pool.query(
       `
@@ -35,12 +60,25 @@ router.post("/", validarToken, async (req, res) => {
         nombre,
         telefono,
         email,
-        direccion
+        direccion,
+        empresa_id
       )
-      VALUES ($1,$2,$3,$4)
-      RETURNING *
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING
+        id,
+        nombre,
+        telefono,
+        email,
+        direccion,
+        empresa_id
       `,
-      [nombre, telefono, email, direccion],
+      [
+        nombre.trim(),
+        telefono || "",
+        email || "",
+        direccion || "",
+        req.usuario.empresa_id,
+      ],
     );
 
     res.status(201).json(result.rows[0]);
@@ -53,14 +91,23 @@ router.post("/", validarToken, async (req, res) => {
   }
 });
 
+// ==========================================
 // ACTUALIZAR CLIENTE
+// ==========================================
+
 router.put("/:id", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
 
     const { nombre, telefono, email, direccion } = req.body;
 
-    await pool.query(
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({
+        mensaje: "El nombre del cliente es obligatorio.",
+      });
+    }
+
+    const result = await pool.query(
       `
       UPDATE clientes
       SET
@@ -68,13 +115,36 @@ router.put("/:id", validarToken, async (req, res) => {
         telefono = $2,
         email = $3,
         direccion = $4
-      WHERE id = $5
+      WHERE
+        id = $5
+        AND empresa_id = $6
+      RETURNING
+        id,
+        nombre,
+        telefono,
+        email,
+        direccion,
+        empresa_id
       `,
-      [nombre, telefono, email, direccion, id],
+      [
+        nombre.trim(),
+        telefono || "",
+        email || "",
+        direccion || "",
+        id,
+        req.usuario.empresa_id,
+      ],
     );
 
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Cliente no encontrado.",
+      });
+    }
+
     res.json({
-      mensaje: "Cliente actualizado",
+      mensaje: "Cliente actualizado correctamente.",
+      cliente: result.rows[0],
     });
   } catch (error) {
     console.error(error);
@@ -85,24 +155,37 @@ router.put("/:id", validarToken, async (req, res) => {
   }
 });
 
+// ==========================================
 // ELIMINAR CLIENTE
+// ==========================================
+
 router.delete("/:id", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query(
+    const result = await pool.query(
       `
-      DELETE FROM clientes
+      UPDATE clientes
+      SET activo = FALSE
       WHERE id = $1
+      AND empresa_id = $2
+      AND activo = TRUE
+      RETURNING id
       `,
-      [id],
+      [id, req.usuario.empresa_id],
     );
 
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Cliente no encontrado.",
+      });
+    }
+
     res.json({
-      mensaje: "Cliente eliminado",
+      mensaje: "Cliente eliminado correctamente.",
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error al eliminar cliente:", error);
 
     res.status(500).json({
       mensaje: "Error al eliminar cliente",

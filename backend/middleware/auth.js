@@ -12,21 +12,26 @@ const validarToken = (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
-    console.log("TOKEN:", token);
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    console.log("DECODED:", decoded);
+    // SUPER_ADMIN no necesita empresa asignada
+    if (decoded.rol !== "SUPER_ADMIN" && !decoded.empresa_id) {
+      return res.status(401).json({
+        mensaje: "Usuario sin empresa asignada",
+      });
+    }
 
     req.usuario = decoded;
 
     next();
   } catch (error) {
-    console.error(error);
+    console.error("Error autenticando:", error);
 
-    return res.status(401).json({
-      mensaje: "Token inválido",
-    });
+    if (!res.headersSent) {
+      return res.status(401).json({
+        mensaje: "Token inválido",
+      });
+    }
   }
 };
 
