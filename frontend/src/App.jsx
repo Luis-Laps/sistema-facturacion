@@ -14,56 +14,75 @@ import ReportesCaja from "./pages/ReportesCaja";
 import Empresas from "./pages/Empresas";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import Navbar from "./components/Navbar";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* LOGIN */}
         <Route path="/" element={<Login />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
-
-        <Route path="/productos" element={<Productos />} />
-
-        <Route path="/categorias" element={<Categorias />} />
-
-        <Route path="/clientes" element={<Clientes />} />
-
-        <Route path="/facturas" element={<Facturas />} />
-
-        <Route path="/historial-facturas" element={<HistorialFacturas />} />
-
-        <Route path="/reportes-caja" element={<ReportesCaja />} />
-
+        {/* SISTEMA */}
         <Route
-          path="/empresas"
+          path="*"
           element={
-            <ProtectedRoute roles={["SUPER_ADMIN"]}>
-              <Empresas />
-            </ProtectedRoute>
-          }
-        />
+            <div className="app-layout">
+              <Navbar />
 
-        <Route
-          path="/imprimir-factura/:id"
-          element={<ImprimirFacturaTicket />}
-        />
+              <main className="app-content">
+                <Routes>
+                  <Route path="/dashboard" element={<Dashboard />} />
 
-        <Route
-          path="/usuarios"
-          element={
-            <ProtectedRoute roles={["ADMIN"]}>
-              <Usuarios />
-            </ProtectedRoute>
-          }
-        />
+                  <Route path="/productos" element={<Productos />} />
 
-        <Route
-          path="/configuracion"
-          element={
-            <ProtectedRoute roles={["ADMIN"]}>
-              <Configuracion />
-            </ProtectedRoute>
+                  <Route path="/categorias" element={<Categorias />} />
+
+                  <Route path="/clientes" element={<Clientes />} />
+
+                  <Route path="/facturas" element={<Facturas />} />
+
+                  <Route
+                    path="/historial-facturas"
+                    element={<HistorialFacturas />}
+                  />
+
+                  <Route path="/reportes-caja" element={<ReportesCaja />} />
+
+                  <Route
+                    path="/empresas"
+                    element={
+                      <ProtectedRoute roles={["SUPER_ADMIN"]}>
+                        <Empresas />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/imprimir-factura/:id"
+                    element={<ImprimirFacturaTicket />}
+                  />
+
+                  <Route
+                    path="/usuarios"
+                    element={
+                      <ProtectedRoute roles={["ADMIN"]}>
+                        <Usuarios />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/configuracion"
+                    element={
+                      <ProtectedRoute roles={["ADMIN"]}>
+                        <Configuracion />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Routes>
+              </main>
+            </div>
           }
         />
       </Routes>

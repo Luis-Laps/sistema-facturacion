@@ -100,7 +100,6 @@ router.get("/", validarToken, async (req, res) => {
                   COALESCE(fd.costo_manual, 0)
                   * fd.cantidad
                 )
-
               ELSE
                 (
                   fd.precio * fd.cantidad
@@ -114,7 +113,6 @@ router.get("/", validarToken, async (req, res) => {
           ),
           0
         ) AS total
-
       FROM factura_detalle fd
 
       INNER JOIN facturas f
@@ -126,6 +124,24 @@ router.get("/", validarToken, async (req, res) => {
 
       WHERE f.empresa_id = $1
       AND DATE(f.fecha) BETWEEN $2 AND $3
+      `,
+      [empresaId, desde, hasta],
+    );
+
+    // ==========================================
+    // VENTAS POR DÍA
+    // ==========================================
+
+    const ventasPorDia = await pool.query(
+      `
+      SELECT
+        DATE(fecha) AS fecha,
+        COALESCE(SUM(total), 0) AS total
+      FROM facturas
+      WHERE empresa_id = $1
+      AND DATE(fecha) BETWEEN $2 AND $3
+      GROUP BY DATE(fecha)
+      ORDER BY DATE(fecha) ASC
       `,
       [empresaId, desde, hasta],
     );
@@ -150,7 +166,6 @@ router.get("/", validarToken, async (req, res) => {
       WHERE f.empresa_id = $1
 
       ORDER BY f.id DESC
-
       LIMIT 10
       `,
       [empresaId],
@@ -170,6 +185,11 @@ router.get("/", validarToken, async (req, res) => {
       ventas: Number(ventas.rows[0].total),
 
       ganancias: Number(ganancias.rows[0].total),
+
+      ventasPorDia: ventasPorDia.rows.map((item) => ({
+        fecha: item.fecha,
+        total: Number(item.total),
+      })),
 
       ultimasFacturas: ultimasFacturas.rows,
     });
