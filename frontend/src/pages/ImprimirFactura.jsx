@@ -55,9 +55,7 @@ function ImprimirFactura() {
           <h2>{empresa.nombre}</h2>
 
           <p className="mb-1">{empresa.telefono}</p>
-
           <p className="mb-1">{empresa.direccion}</p>
-
           <p>{empresa.correo}</p>
 
           <p className="text-muted">Reparación, Brillo y Pintura</p>
@@ -67,17 +65,30 @@ function ImprimirFactura() {
           <h3>Factura #{factura.factura.id}</h3>
         </div>
 
+        {/* INFORMACIÓN DE LA FACTURA */}
         <div className="row mb-4">
-          <div className="col-6">
+          <div className="col-md-4">
             <strong>Cliente:</strong> {factura.factura.cliente}
           </div>
 
-          <div className="col-6 text-end">
+          <div className="col-md-4">
             <strong>Fecha:</strong>{" "}
             {new Date(factura.factura.fecha).toLocaleDateString()}
           </div>
+
+          <div className="col-md-4 text-md-end">
+            <strong>Forma de pago:</strong>{" "}
+            {factura.factura.forma_pago === "EFECTIVO"
+              ? "💵 Efectivo"
+              : factura.factura.forma_pago === "TARJETA"
+                ? "💳 Tarjeta"
+                : factura.factura.forma_pago === "TRANSFERENCIA"
+                  ? "🏦 Transferencia"
+                  : factura.factura.forma_pago || "No especificada"}
+          </div>
         </div>
 
+        {/* DETALLE DE LA FACTURA */}
         <table className="table table-bordered">
           <thead className="table-light">
             <tr>
@@ -109,6 +120,7 @@ function ImprimirFactura() {
           </tbody>
         </table>
 
+        {/* TOTAL */}
         <h2
           className="text-end mt-4"
           style={{
@@ -128,6 +140,7 @@ function ImprimirFactura() {
 
         <p className="text-center">Tel: {empresa.telefono}</p>
 
+        {/* BOTÓN IMPRIMIR */}
         <div className="text-center mt-4">
           <button
             className="btn btn-success no-print"
@@ -138,10 +151,10 @@ function ImprimirFactura() {
         </div>
       </div>
 
+      {/* ESTILOS DE IMPRESIÓN */}
       <style>
         {`
           @media print {
-
             .no-print {
               display: none !important;
             }
@@ -154,7 +167,6 @@ function ImprimirFactura() {
             .container {
               max-width: 100% !important;
             }
-
           }
         `}
       </style>

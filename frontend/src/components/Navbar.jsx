@@ -250,6 +250,16 @@ function Navbar() {
               >
                 Historial
               </Link>
+
+              <Link
+                to="/cotizacion"
+                className={`sidebar-sublink ${
+                  estaActivo("/cotizacion") ? "sidebar-sublink-active" : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                Cotización
+              </Link>
             </div>
           )}
 

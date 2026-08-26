@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+
 import Navbar from "../components/Navbar";
+
 import api from "../services/api";
+
 import Swal from "sweetalert2";
 
 function HistorialFacturas() {
@@ -23,7 +26,6 @@ function HistorialFacturas() {
       const response = await api.get(`/facturas/${id}`);
 
       setDetalleFactura(response.data);
-
       setMostrarDetalle(true);
     } catch (error) {
       console.error(error);
@@ -67,6 +69,22 @@ function HistorialFacturas() {
     }
   };
 
+  const mostrarFormaPago = (formaPago) => {
+    switch (formaPago) {
+      case "EFECTIVO":
+        return "💵 Efectivo";
+
+      case "TARJETA":
+        return "💳 Tarjeta";
+
+      case "TRANSFERENCIA":
+        return "🏦 Transferencia";
+
+      default:
+        return formaPago || "No especificada";
+    }
+  };
+
   useEffect(() => {
     cargarFacturas();
   }, []);
@@ -78,49 +96,74 @@ function HistorialFacturas() {
       <div className="container mt-4">
         <h2>Historial de Facturas</h2>
 
-        <table className="table table-striped">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Cliente</th>
-              <th>Fecha</th>
-              <th>Total</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {facturas.map((factura) => (
-              <tr key={factura.id}>
-                <td>{factura.id}</td>
-
-                <td>{factura.cliente}</td>
-
-                <td>{new Date(factura.fecha).toLocaleDateString()}</td>
-
-                <td>RD$ {Number(factura.total).toLocaleString()}</td>
-
-                <td>
-                  <div className="btn-group">
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => verDetalle(factura.id)}
-                    >
-                      👁 Ver
-                    </button>
-
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => eliminarFactura(factura.id)}
-                    >
-                      🗑 Eliminar
-                    </button>
-                  </div>
-                </td>
+        <div className="table-responsive">
+          <table className="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Cliente</th>
+                <th>Fecha</th>
+                <th>Total</th>
+                <th>Forma de pago</th>
+                <th>Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {facturas.map((factura) => (
+                <tr key={factura.id}>
+                  <td>{factura.id}</td>
+
+                  <td>{factura.cliente}</td>
+
+                  <td>{new Date(factura.fecha).toLocaleDateString()}</td>
+
+                  <td>
+                    RD${" "}
+                    {Number(factura.total).toLocaleString("es-DO", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+
+                  <td>
+                    <span
+                      className={`badge ${
+                        factura.forma_pago === "EFECTIVO"
+                          ? "bg-success"
+                          : factura.forma_pago === "TARJETA"
+                            ? "bg-primary"
+                            : factura.forma_pago === "TRANSFERENCIA"
+                              ? "bg-info text-dark"
+                              : "bg-secondary"
+                      }`}
+                    >
+                      {mostrarFormaPago(factura.forma_pago)}
+                    </span>
+                  </td>
+
+                  <td>
+                    <div className="btn-group">
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => verDetalle(factura.id)}
+                      >
+                        👁 Ver
+                      </button>
+
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => eliminarFactura(factura.id)}
+                      >
+                        🗑 Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {mostrarDetalle && detalleFactura && (
@@ -142,14 +185,23 @@ function HistorialFacturas() {
               </div>
 
               <div className="modal-body">
-                <p>
-                  <strong>Cliente:</strong> {detalleFactura.factura.cliente}
-                </p>
+                <div className="row mb-3">
+                  <div className="col-md-4">
+                    <strong>Cliente:</strong> {detalleFactura.factura.cliente}
+                  </div>
 
-                <p>
-                  <strong>Fecha:</strong>{" "}
-                  {new Date(detalleFactura.factura.fecha).toLocaleDateString()}
-                </p>
+                  <div className="col-md-4">
+                    <strong>Fecha:</strong>{" "}
+                    {new Date(
+                      detalleFactura.factura.fecha,
+                    ).toLocaleDateString()}
+                  </div>
+
+                  <div className="col-md-4">
+                    <strong>Forma de pago:</strong>{" "}
+                    {mostrarFormaPago(detalleFactura.factura.forma_pago)}
+                  </div>
+                </div>
 
                 <table className="table">
                   <thead>
@@ -168,17 +220,35 @@ function HistorialFacturas() {
 
                         <td>{item.cantidad}</td>
 
-                        <td>RD$ {item.precio}</td>
+                        <td>
+                          RD${" "}
+                          {Number(item.precio).toLocaleString("es-DO", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
 
-                        <td>RD$ {item.subtotal}</td>
+                        <td>
+                          RD${" "}
+                          {Number(item.subtotal).toLocaleString("es-DO", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
-                <h4>
-                  Total: RD$
-                  {detalleFactura.factura.total}
+                <h4 className="text-end">
+                  Total: RD${" "}
+                  {Number(detalleFactura.factura.total).toLocaleString(
+                    "es-DO",
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    },
+                  )}
                 </h4>
               </div>
             </div>

@@ -12,6 +12,7 @@ import ImprimirFacturaTicket from "./pages/ImprimirFacturaTicket";
 import Usuarios from "./pages/Usuarios";
 import ReportesCaja from "./pages/ReportesCaja";
 import Empresas from "./pages/Empresas";
+import Cotizacion from "./pages/Cotizacion";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
@@ -80,6 +81,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/cotizacion" element={<Cotizacion />} />
                 </Routes>
               </main>
             </div>

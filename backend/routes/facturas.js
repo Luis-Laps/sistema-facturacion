@@ -402,6 +402,7 @@ router.get("/", validarToken, async (req, res) => {
           f.id,
           f.fecha,
           f.total,
+           f.forma_pago,
           c.nombre AS cliente
         FROM facturas f
         INNER JOIN clientes c
@@ -437,6 +438,7 @@ router.get("/:id", validarToken, async (req, res) => {
       f.id,
       f.fecha,
       f.total,
+      f.forma_pago,
       c.nombre AS cliente,
       u.nombre AS usuario_nombre,
       u.usuario AS usuario

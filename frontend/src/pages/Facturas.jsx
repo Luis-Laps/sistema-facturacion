@@ -11,6 +11,8 @@ function Facturas() {
   const [clienteId, setClienteId] = useState("");
 
   const [productoId, setProductoId] = useState("");
+  const [busquedaProducto, setBusquedaProducto] = useState("");
+  const [mostrarResultados, setMostrarResultados] = useState(false);
   const [cantidad, setCantidad] = useState(1);
   const [precio, setPrecio] = useState("");
   const [descuento, setDescuento] = useState(0);
@@ -41,6 +43,17 @@ function Facturas() {
       console.error(error);
     }
   };
+
+  const productosFiltrados = productos.filter((producto) => {
+    const texto = busquedaProducto.trim().toLowerCase();
+
+    if (!texto) return false;
+
+    return (
+      producto.nombre?.toLowerCase().includes(texto) ||
+      producto.codigo?.toLowerCase().includes(texto)
+    );
+  });
 
   useEffect(() => {
     cargarDatos();
@@ -215,33 +228,68 @@ function Facturas() {
           </div>
 
           <h5>Agregar Producto</h5>
-
-          <select
-            className="form-control mb-2"
-            value={productoId}
-            onChange={(e) => {
-              const id = e.target.value;
-
-              setProductoId(id);
-
-              const prod = productos.find((p) => p.id === Number(id));
-
-              if (prod) {
-                setPrecio(prod.precio_venta);
-              } else {
+          <div className="position-relative mb-2">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Buscar producto por nombre o código..."
+              value={busquedaProducto}
+              onChange={(e) => {
+                setBusquedaProducto(e.target.value);
+                setMostrarResultados(true);
+                setProductoId("");
                 setPrecio("");
-              }
-            }}
-          >
-            <option value="">Seleccione un producto</option>
+              }}
+              onFocus={() => {
+                if (busquedaProducto.trim()) {
+                  setMostrarResultados(true);
+                }
+              }}
+            />
 
-            {productos.map((producto) => (
-              <option key={producto.id} value={producto.id}>
-                {producto.nombre}
-              </option>
-            ))}
-          </select>
+            {mostrarResultados && busquedaProducto.trim() && (
+              <div
+                className="position-absolute bg-white border rounded shadow w-100"
+                style={{
+                  zIndex: 1000,
+                  maxHeight: "250px",
+                  overflowY: "auto",
+                }}
+              >
+                {productosFiltrados.length === 0 ? (
+                  <div className="p-3 text-muted">
+                    No se encontraron productos.
+                  </div>
+                ) : (
+                  productosFiltrados.map((producto) => (
+                    <button
+                      key={producto.id}
+                      type="button"
+                      className="w-100 text-start border-0 bg-white p-2"
+                      onClick={() => {
+                        setProductoId(String(producto.id));
+                        setBusquedaProducto(
+                          `${producto.codigo} — ${producto.nombre}`,
+                        );
+                        setPrecio(producto.precio_venta);
+                        setMostrarResultados(false);
+                      }}
+                    >
+                      <div className="fw-semibold">{producto.nombre}</div>
 
+                      <small className="text-muted">
+                        Código: {producto.codigo} | Precio: RD${" "}
+                        {Number(producto.precio_venta).toLocaleString("es-DO", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </small>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <input
             type="number"
             className="form-control mb-2"
