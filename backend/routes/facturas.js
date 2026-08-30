@@ -16,7 +16,59 @@ router.post("/", validarToken, async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const { cliente_id, productos, forma_pago = "EFECTIVO" } = req.body;
+    const {
+      cliente_id,
+      productos,
+      forma_pago = "EFECTIVO",
+      propina_aplicada = false,
+    } = req.body;
+
+    // ==========================================
+    // VALIDAR PRODUCTOS
+    // ==========================================
+
+    if (!Array.isArray(productos) || productos.length === 0) {
+      throw new Error(
+        "La factura debe contener al menos un producto o servicio.",
+      );
+    }
+
+    // ==========================================
+    // OBTENER CONFIGURACIÓN DE LA EMPRESA
+    // ==========================================
+
+    const empresaResult = await client.query(
+      `
+      SELECT
+        id,
+        propina_ley
+      FROM empresas
+      WHERE id = $1
+      `,
+      [req.usuario.empresa_id],
+    );
+
+    if (empresaResult.rows.length === 0) {
+      throw new Error("Empresa no encontrada.");
+    }
+
+    const empresa = empresaResult.rows[0];
+
+    // ==========================================
+    // VALIDAR PROPINA
+    // ==========================================
+
+    let aplicarPropina = false;
+
+    if (propina_aplicada === true) {
+      if (empresa.propina_ley !== true) {
+        throw new Error(
+          "La propina de ley no está habilitada para esta empresa.",
+        );
+      }
+
+      aplicarPropina = true;
+    }
 
     // ==========================================
     // VALIDAR CLIENTE
@@ -69,10 +121,10 @@ router.post("/", validarToken, async (req, res) => {
     const cajaId = caja.rows[0].id;
 
     // ==========================================
-    // CALCULAR TOTAL
+    // CALCULAR SUBTOTAL
     // ==========================================
 
-    let total = 0;
+    let subtotal = 0;
 
     for (const item of productos) {
       // ========================================
@@ -97,7 +149,13 @@ router.post("/", validarToken, async (req, res) => {
           throw new Error("El descuento no puede ser negativo.");
         }
 
-        total += precio * cantidad - descuento;
+        const subtotalServicio = precio * cantidad - descuento;
+
+        if (subtotalServicio < 0) {
+          throw new Error("El subtotal de un servicio no puede ser negativo.");
+        }
+
+        subtotal += subtotalServicio;
 
         continue;
       }
@@ -149,14 +207,45 @@ router.post("/", validarToken, async (req, res) => {
         throw new Error("El descuento no puede ser negativo.");
       }
 
-      total += precio * cantidad - descuento;
+      const subtotalProducto = precio * cantidad - descuento;
+
+      if (subtotalProducto < 0) {
+        throw new Error(
+          `El subtotal del producto "${productoActual.nombre}" no puede ser negativo.`,
+        );
+      }
+
+      subtotal += subtotalProducto;
     }
+
+    // ==========================================
+    // REDONDEAR SUBTOTAL
+    // ==========================================
+
+    subtotal = Math.round((subtotal + Number.EPSILON) * 100) / 100;
+
+    // ==========================================
+    // CALCULAR PROPINA
+    // ==========================================
+
+    let propina = 0;
+
+    if (aplicarPropina) {
+      propina = Math.round((subtotal * 0.1 + Number.EPSILON) * 100) / 100;
+    }
+
+    // ==========================================
+    // CALCULAR TOTAL FINAL
+    // ==========================================
+
+    const total = Math.round((subtotal + propina + Number.EPSILON) * 100) / 100;
 
     console.log("================================");
     console.log("Productos:", productos);
+    console.log("Subtotal:", subtotal);
+    console.log("Propina aplicada:", aplicarPropina);
+    console.log("Propina:", propina);
     console.log("Total calculado:", total);
-    console.log("Tipo de total:", typeof total);
-    console.log("¿Es NaN?", Number.isNaN(total));
     console.log("================================");
 
     if (Number.isNaN(total)) {
@@ -173,28 +262,32 @@ router.post("/", validarToken, async (req, res) => {
 
     const facturaResult = await client.query(
       `
-        INSERT INTO facturas
-        (
-          cliente_id,
-          fecha,
-          total,
-          caja_id,
-          forma_pago,
-          empresa_id,
-          usuario_id
-        )
-        VALUES
-        (
-          $1,
-          NOW(),
-          $2,
-          $3,
-          $4,
-          $5,
-          $6
-        )
-        RETURNING id
-        `,
+      INSERT INTO facturas
+      (
+        cliente_id,
+        fecha,
+        total,
+        caja_id,
+        forma_pago,
+        empresa_id,
+        usuario_id,
+        propina_aplicada,
+        propina
+      )
+      VALUES
+      (
+        $1,
+        NOW() AT TIME ZONE 'America/Santo_Domingo',
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8
+      )
+      RETURNING id
+      `,
       [
         cliente_id,
         total,
@@ -202,6 +295,8 @@ router.post("/", validarToken, async (req, res) => {
         forma_pago,
         req.usuario.empresa_id,
         req.usuario.id,
+        aplicarPropina,
+        propina,
       ],
     );
 
@@ -293,7 +388,8 @@ router.post("/", validarToken, async (req, res) => {
           precio,
           descuento
         )
-        VALUES ($1,$2,$3,$4,$5)
+        VALUES
+        ($1, $2, $3, $4, $5)
         `,
         [
           facturaId,
@@ -311,13 +407,13 @@ router.post("/", validarToken, async (req, res) => {
       if (productoActual.tipo === "PRODUCTO") {
         const stockResult = await client.query(
           `
-            UPDATE productos
-            SET stock = stock - $1
-            WHERE id = $2
-            AND empresa_id = $3
-            AND stock >= $1
-            RETURNING id
-            `,
+          UPDATE productos
+          SET stock = stock - $1
+          WHERE id = $2
+          AND empresa_id = $3
+          AND stock >= $1
+          RETURNING id
+          `,
           [item.cantidad, item.producto_id, req.usuario.empresa_id],
         );
 
@@ -372,10 +468,18 @@ router.post("/", validarToken, async (req, res) => {
         break;
     }
 
+    // ==========================================
+    // CONFIRMAR TRANSACCIÓN
+    // ==========================================
+
     await client.query("COMMIT");
 
     res.status(201).json({
       factura_id: facturaId,
+      subtotal,
+      propina_aplicada: aplicarPropina,
+      propina,
+      total,
     });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -398,19 +502,21 @@ router.get("/", validarToken, async (req, res) => {
   try {
     const result = await pool.query(
       `
-        SELECT
-          f.id,
-          f.fecha,
-          f.total,
-           f.forma_pago,
-          c.nombre AS cliente
-        FROM facturas f
-        INNER JOIN clientes c
-          ON c.id = f.cliente_id
-          AND c.empresa_id = f.empresa_id
-        WHERE f.empresa_id = $1
-        ORDER BY f.id DESC
-        `,
+      SELECT
+        f.id,
+        f.fecha,
+        f.total,
+        f.forma_pago,
+        f.propina_aplicada,
+        f.propina,
+        c.nombre AS cliente
+      FROM facturas f
+      INNER JOIN clientes c
+        ON c.id = f.cliente_id
+        AND c.empresa_id = f.empresa_id
+      WHERE f.empresa_id = $1
+      ORDER BY f.id DESC
+      `,
       [req.usuario.empresa_id],
     );
 
@@ -434,27 +540,29 @@ router.get("/:id", validarToken, async (req, res) => {
 
     const facturaResult = await pool.query(
       `
-    SELECT
-      f.id,
-      f.fecha,
-      f.total,
-      f.forma_pago,
-      c.nombre AS cliente,
-      u.nombre AS usuario_nombre,
-      u.usuario AS usuario
-    FROM facturas f
+      SELECT
+        f.id,
+        f.fecha,
+        f.total,
+        f.forma_pago,
+        f.propina_aplicada,
+        f.propina,
+        c.nombre AS cliente,
+        u.nombre AS usuario_nombre,
+        u.usuario AS usuario
+      FROM facturas f
 
-    INNER JOIN clientes c
-      ON c.id = f.cliente_id
-      AND c.empresa_id = f.empresa_id
+      INNER JOIN clientes c
+        ON c.id = f.cliente_id
+        AND c.empresa_id = f.empresa_id
 
-    LEFT JOIN usuarios u
-      ON u.id = f.usuario_id
-      AND u.empresa_id = f.empresa_id
+      LEFT JOIN usuarios u
+        ON u.id = f.usuario_id
+        AND u.empresa_id = f.empresa_id
 
-    WHERE f.id = $1
-    AND f.empresa_id = $2
-    `,
+      WHERE f.id = $1
+      AND f.empresa_id = $2
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -466,37 +574,37 @@ router.get("/:id", validarToken, async (req, res) => {
 
     const detalleResult = await pool.query(
       `
-          SELECT
-            CASE
-              WHEN fd.es_servicio = TRUE
-                THEN fd.descripcion_manual
-              ELSE p.nombre
-            END AS nombre,
+      SELECT
+        CASE
+          WHEN fd.es_servicio = TRUE
+            THEN fd.descripcion_manual
+          ELSE p.nombre
+        END AS nombre,
 
-            fd.es_servicio,
-            fd.cantidad,
-            fd.precio,
-            fd.descuento,
-            fd.costo_manual,
+        fd.es_servicio,
+        fd.cantidad,
+        fd.precio,
+        fd.descuento,
+        fd.costo_manual,
 
-            (
-              fd.cantidad * fd.precio
-            ) -
-            COALESCE(fd.descuento, 0)
-            AS subtotal
+        (
+          fd.cantidad * fd.precio
+        ) -
+        COALESCE(fd.descuento, 0)
+        AS subtotal
 
-          FROM factura_detalle fd
+      FROM factura_detalle fd
 
-          INNER JOIN facturas f
-            ON f.id = fd.factura_id
-            AND f.empresa_id = $2
+      INNER JOIN facturas f
+        ON f.id = fd.factura_id
+        AND f.empresa_id = $2
 
-          LEFT JOIN productos p
-            ON p.id = fd.producto_id
-            AND p.empresa_id = $2
+      LEFT JOIN productos p
+        ON p.id = fd.producto_id
+        AND p.empresa_id = $2
 
-          WHERE fd.factura_id = $1
-          `,
+      WHERE fd.factura_id = $1
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -523,6 +631,7 @@ router.delete("/:id", validarToken, async (req, res) => {
       mensaje: "No tienes permisos para eliminar facturas.",
     });
   }
+
   const client = await pool.connect();
 
   try {
@@ -536,11 +645,11 @@ router.delete("/:id", validarToken, async (req, res) => {
 
     const factura = await client.query(
       `
-          SELECT *
-          FROM facturas
-          WHERE id = $1
-          AND empresa_id = $2
-          `,
+      SELECT *
+      FROM facturas
+      WHERE id = $1
+      AND empresa_id = $2
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -556,13 +665,13 @@ router.delete("/:id", validarToken, async (req, res) => {
 
     const detalle = await client.query(
       `
-          SELECT *
-          FROM factura_detalle fd
-          INNER JOIN facturas f
-            ON f.id = fd.factura_id
-            AND f.empresa_id = $2
-          WHERE fd.factura_id = $1
-          `,
+      SELECT *
+      FROM factura_detalle fd
+      INNER JOIN facturas f
+        ON f.id = fd.factura_id
+        AND f.empresa_id = $2
+      WHERE fd.factura_id = $1
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -574,11 +683,11 @@ router.delete("/:id", validarToken, async (req, res) => {
       if (item.es_servicio !== true && item.producto_id) {
         await client.query(
           `
-            UPDATE productos
-            SET stock = stock + $1
-            WHERE id = $2
-            AND empresa_id = $3
-            `,
+          UPDATE productos
+          SET stock = stock + $1
+          WHERE id = $2
+          AND empresa_id = $3
+          `,
           [item.cantidad, item.producto_id, req.usuario.empresa_id],
         );
       }
@@ -592,12 +701,12 @@ router.delete("/:id", validarToken, async (req, res) => {
       case "EFECTIVO":
         await client.query(
           `
-            UPDATE cajas
-            SET efectivo =
-              COALESCE(efectivo, 0) - $1
-            WHERE id = $2
-            AND empresa_id = $3
-            `,
+          UPDATE cajas
+          SET efectivo =
+            COALESCE(efectivo, 0) - $1
+          WHERE id = $2
+          AND empresa_id = $3
+          `,
           [facturaActual.total, facturaActual.caja_id, req.usuario.empresa_id],
         );
         break;
@@ -605,12 +714,12 @@ router.delete("/:id", validarToken, async (req, res) => {
       case "TARJETA":
         await client.query(
           `
-            UPDATE cajas
-            SET tarjeta =
-              COALESCE(tarjeta, 0) - $1
-            WHERE id = $2
-            AND empresa_id = $3
-            `,
+          UPDATE cajas
+          SET tarjeta =
+            COALESCE(tarjeta, 0) - $1
+          WHERE id = $2
+          AND empresa_id = $3
+          `,
           [facturaActual.total, facturaActual.caja_id, req.usuario.empresa_id],
         );
         break;
@@ -618,12 +727,12 @@ router.delete("/:id", validarToken, async (req, res) => {
       case "TRANSFERENCIA":
         await client.query(
           `
-            UPDATE cajas
-            SET transferencia =
-              COALESCE(transferencia, 0) - $1
-            WHERE id = $2
-            AND empresa_id = $3
-            `,
+          UPDATE cajas
+          SET transferencia =
+            COALESCE(transferencia, 0) - $1
+          WHERE id = $2
+          AND empresa_id = $3
+          `,
           [facturaActual.total, facturaActual.caja_id, req.usuario.empresa_id],
         );
         break;
@@ -635,9 +744,9 @@ router.delete("/:id", validarToken, async (req, res) => {
 
     await client.query(
       `
-        DELETE FROM factura_detalle
-        WHERE factura_id = $1
-        `,
+      DELETE FROM factura_detalle
+      WHERE factura_id = $1
+      `,
       [id],
     );
 
@@ -647,12 +756,16 @@ router.delete("/:id", validarToken, async (req, res) => {
 
     await client.query(
       `
-        DELETE FROM facturas
-        WHERE id = $1
-        AND empresa_id = $2
-        `,
+      DELETE FROM facturas
+      WHERE id = $1
+      AND empresa_id = $2
+      `,
       [id, req.usuario.empresa_id],
     );
+
+    // ========================================
+    // CONFIRMAR
+    // ========================================
 
     await client.query("COMMIT");
 

@@ -29,6 +29,10 @@ function Productos() {
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
+  const [inversion, setInversion] = useState(0);
+  const [gananciaProyectada, setGananciaProyectada] = useState(0);
+  const [valorTotal, setValorTotal] = useState(0);
+
   const [busqueda, setBusqueda] = useState("");
 
   const [mostrarModal, setMostrarModal] = useState(false);
@@ -48,6 +52,9 @@ function Productos() {
       setProductos(response.data.data);
       setTotalPages(response.data.totalPages);
       setTotalProductos(response.data.total);
+      setInversion(response.data.inversion);
+      setGananciaProyectada(response.data.gananciaProyectada);
+      setValorTotal(response.data.valorTotal);
     } catch (error) {
       console.error(error);
     }
@@ -116,7 +123,11 @@ function Productos() {
 
   const guardarProducto = async () => {
     try {
-      if (!producto.codigo || !producto.nombre || !producto.categoria_id) {
+      if (
+        (producto.tipo === "PRODUCTO" && !producto.codigo) ||
+        !producto.nombre ||
+        !producto.categoria_id
+      ) {
         Swal.fire("Atención", "Complete los campos obligatorios.", "warning");
         return;
       }
@@ -128,7 +139,8 @@ function Productos() {
         descripcion: producto.descripcion,
         costo_compra: Number(producto.costo_compra),
         precio_venta: Number(producto.precio_venta),
-        stock: Number(producto.stock),
+        stock: producto.tipo === "PRODUCTO" ? Number(producto.stock) : 0,
+
         tipo: producto.tipo,
       };
 
@@ -285,6 +297,81 @@ function Productos() {
         </div>
 
         {/* ==========================================
+    RESUMEN DEL INVENTARIO
+========================================== */}
+
+        <div className="row g-3 mb-4">
+          {/* INVERSIÓN */}
+          <div className="col-md-4">
+            <div className="card shadow-sm border-0 h-100">
+              <div className="card-body">
+                <small className="text-muted fw-semibold">
+                  💰 Inversión en inventario
+                </small>
+
+                <h3 className="fw-bold mt-2 mb-0">
+                  RD${" "}
+                  {Number(inversion).toLocaleString("es-DO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </h3>
+
+                <small className="text-muted">
+                  Valor actual de la mercancía
+                </small>
+              </div>
+            </div>
+          </div>
+
+          {/* GANANCIA PROYECTADA */}
+          <div className="col-md-4">
+            <div className="card shadow-sm border-0 h-100">
+              <div className="card-body">
+                <small className="text-muted fw-semibold">
+                  📈 Ganancia proyectada
+                </small>
+
+                <h3 className="fw-bold text-success mt-2 mb-0">
+                  RD${" "}
+                  {Number(gananciaProyectada).toLocaleString("es-DO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </h3>
+
+                <small className="text-muted">
+                  Si vendes todo el inventario
+                </small>
+              </div>
+            </div>
+          </div>
+
+          {/* VALOR TOTAL */}
+          <div className="col-md-4">
+            <div className="card shadow-sm border-0 h-100">
+              <div className="card-body">
+                <small className="text-muted fw-semibold">
+                  💵 Valor total del inventario
+                </small>
+
+                <h3 className="fw-bold mt-2 mb-0">
+                  RD${" "}
+                  {Number(valorTotal).toLocaleString("es-DO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </h3>
+
+                <small className="text-muted">
+                  Inversión + ganancia proyectada
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ==========================================
             BUSCADOR
         ========================================== */}
 
@@ -434,16 +521,18 @@ function Productos() {
 
                 <div className="modal-body">
                   <div className="row">
-                    <div className="col-md-4 mb-3">
-                      <label>Código</label>
+                    {producto.tipo === "PRODUCTO" && (
+                      <div className="col-md-4 mb-3">
+                        <label>Código</label>
 
-                      <input
-                        className="form-control"
-                        name="codigo"
-                        value={producto.codigo}
-                        onChange={handleChange}
-                      />
-                    </div>
+                        <input
+                          className="form-control"
+                          name="codigo"
+                          value={producto.codigo}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    )}
 
                     <div className="col-md-8 mb-3">
                       <label>Nombre</label>
@@ -489,7 +578,7 @@ function Productos() {
                         onChange={handleChange}
                       >
                         <option value="PRODUCTO">Producto</option>
-
+                        <option value="ALIMENTO">Alimento</option>
                         <option value="SERVICIO">Servicio</option>
                       </select>
                     </div>

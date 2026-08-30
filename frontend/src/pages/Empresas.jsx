@@ -18,10 +18,18 @@ function Empresas() {
     correo: "",
     logo_url: "",
     color_principal: "#198754",
+
+    // Características de la empresa
+    propina_ley: false,
+
     admin_nombre: "",
     admin_usuario: "",
     admin_password: "",
   });
+
+  // ==========================================
+  // CARGAR EMPRESAS
+  // ==========================================
 
   const cargarEmpresas = async () => {
     try {
@@ -39,14 +47,22 @@ function Empresas() {
     cargarEmpresas();
   }, []);
 
+  // ==========================================
+  // CAMBIAR CAMPOS
+  // ==========================================
+
   const cambiarCampo = (e) => {
-    const { name, value } = e.target;
+    const { name, type, checked, value } = e.target;
 
     setForm({
       ...form,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     });
   };
+
+  // ==========================================
+  // ABRIR FORMULARIO
+  // ==========================================
 
   const abrirFormulario = () => {
     setForm({
@@ -57,6 +73,10 @@ function Empresas() {
       correo: "",
       logo_url: "",
       color_principal: "#198754",
+
+      // Características
+      propina_ley: false,
+
       admin_nombre: "",
       admin_usuario: "",
       admin_password: "",
@@ -65,11 +85,19 @@ function Empresas() {
     setMostrarFormulario(true);
   };
 
+  // ==========================================
+  // CERRAR FORMULARIO
+  // ==========================================
+
   const cerrarFormulario = () => {
     if (guardando) return;
 
     setMostrarFormulario(false);
   };
+
+  // ==========================================
+  // GUARDAR EMPRESA
+  // ==========================================
 
   const guardarEmpresa = async () => {
     if (!form.nombre.trim()) {
@@ -118,6 +146,10 @@ function Empresas() {
       <Navbar />
 
       <div className="container mt-4">
+        {/* ==========================================
+            ENCABEZADO
+        ========================================== */}
+
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h2>Empresas</h2>
@@ -132,61 +164,71 @@ function Empresas() {
           </button>
         </div>
 
+        {/* ==========================================
+            LISTADO
+        ========================================== */}
+
         {cargando ? (
           <div className="text-center">Cargando empresas...</div>
         ) : (
           <div className="card shadow">
             <div className="card-body">
-              <table className="table table-striped align-middle">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Empresa</th>
-                    <th>RNC</th>
-                    <th>Teléfono</th>
-                    <th>Correo</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
+              <div className="table-responsive">
+                <table className="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Empresa</th>
+                      <th>RNC</th>
+                      <th>Teléfono</th>
+                      <th>Correo</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
 
-                <tbody>
-                  {empresas.length > 0 ? (
-                    empresas.map((empresa) => (
-                      <tr key={empresa.id}>
-                        <td>{empresa.id}</td>
+                  <tbody>
+                    {empresas.length > 0 ? (
+                      empresas.map((empresa) => (
+                        <tr key={empresa.id}>
+                          <td>{empresa.id}</td>
 
-                        <td>
-                          <strong>{empresa.nombre}</strong>
-                        </td>
+                          <td>
+                            <strong>{empresa.nombre}</strong>
+                          </td>
 
-                        <td>{empresa.rnc || "-"}</td>
+                          <td>{empresa.rnc || "-"}</td>
 
-                        <td>{empresa.telefono || "-"}</td>
+                          <td>{empresa.telefono || "-"}</td>
 
-                        <td>{empresa.correo || "-"}</td>
+                          <td>{empresa.correo || "-"}</td>
 
-                        <td>
-                          {empresa.activo ? (
-                            <span className="badge bg-success">Activa</span>
-                          ) : (
-                            <span className="badge bg-danger">Inactiva</span>
-                          )}
+                          <td>
+                            {empresa.activo ? (
+                              <span className="badge bg-success">Activa</span>
+                            ) : (
+                              <span className="badge bg-danger">Inactiva</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="text-center">
+                          No hay empresas registradas
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="text-center">
-                        No hay empresas registradas
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* ==========================================
+          MODAL NUEVA EMPRESA
+      ========================================== */}
 
       {mostrarFormulario && (
         <div
@@ -198,6 +240,8 @@ function Empresas() {
         >
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content">
+              {/* HEADER */}
+
               <div className="modal-header">
                 <h5 className="modal-title">Nueva empresa</h5>
 
@@ -208,10 +252,18 @@ function Empresas() {
                 ></button>
               </div>
 
+              {/* BODY */}
+
               <div className="modal-body">
+                {/* ==========================================
+                    INFORMACIÓN DE LA EMPRESA
+                ========================================== */}
+
                 <h6 className="mb-3">Información de la empresa</h6>
 
                 <div className="row">
+                  {/* NOMBRE */}
+
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Nombre *</label>
 
@@ -224,6 +276,8 @@ function Empresas() {
                       placeholder="Nombre de la empresa"
                     />
                   </div>
+
+                  {/* RNC */}
 
                   <div className="col-md-6 mb-3">
                     <label className="form-label">RNC</label>
@@ -238,6 +292,8 @@ function Empresas() {
                     />
                   </div>
 
+                  {/* TELÉFONO */}
+
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Teléfono</label>
 
@@ -250,6 +306,8 @@ function Empresas() {
                       placeholder="Teléfono"
                     />
                   </div>
+
+                  {/* CORREO */}
 
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Correo</label>
@@ -264,6 +322,8 @@ function Empresas() {
                     />
                   </div>
 
+                  {/* DIRECCIÓN */}
+
                   <div className="col-md-12 mb-3">
                     <label className="form-label">Dirección</label>
 
@@ -277,6 +337,8 @@ function Empresas() {
                     />
                   </div>
 
+                  {/* LOGO */}
+
                   <div className="col-md-8 mb-3">
                     <label className="form-label">URL del logo</label>
 
@@ -289,6 +351,8 @@ function Empresas() {
                       placeholder="https://..."
                     />
                   </div>
+
+                  {/* COLOR */}
 
                   <div className="col-md-4 mb-3">
                     <label className="form-label">Color principal</label>
@@ -305,9 +369,50 @@ function Empresas() {
 
                 <hr />
 
+                {/* ==========================================
+                    CARACTERÍSTICAS
+                ========================================== */}
+
+                <h6 className="mb-3">Características de la empresa</h6>
+
+                <div className="card border-0 bg-light mb-4">
+                  <div className="card-body">
+                    <div className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="propina_ley"
+                        name="propina_ley"
+                        checked={form.propina_ley}
+                        onChange={cambiarCampo}
+                      />
+
+                      <label
+                        className="form-check-label fw-semibold"
+                        htmlFor="propina_ley"
+                      >
+                        Habilitar propina de ley (10%)
+                      </label>
+                    </div>
+
+                    <div className="form-text">
+                      Permite que esta empresa pueda aplicar una propina del 10%
+                      individualmente en sus facturas.
+                    </div>
+                  </div>
+                </div>
+
+                <hr />
+
+                {/* ==========================================
+                    ADMINISTRADOR
+                ========================================== */}
+
                 <h6 className="mb-3">Administrador de la empresa</h6>
 
                 <div className="row">
+                  {/* NOMBRE ADMIN */}
+
                   <div className="col-md-6 mb-3">
                     <label className="form-label">
                       Nombre del administrador *
@@ -323,6 +428,8 @@ function Empresas() {
                     />
                   </div>
 
+                  {/* USUARIO */}
+
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Usuario *</label>
 
@@ -335,6 +442,8 @@ function Empresas() {
                       placeholder="usuario"
                     />
                   </div>
+
+                  {/* CONTRASEÑA */}
 
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Contraseña *</label>
@@ -350,6 +459,8 @@ function Empresas() {
                   </div>
                 </div>
               </div>
+
+              {/* FOOTER */}
 
               <div className="modal-footer">
                 <button

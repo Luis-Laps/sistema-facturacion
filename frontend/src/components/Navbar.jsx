@@ -64,7 +64,10 @@ function Navbar() {
       rutas = [rutas];
     }
 
-    return rutas.some((ruta) => location.pathname === ruta);
+    return rutas.some(
+      (ruta) =>
+        location.pathname === ruta || location.pathname.startsWith(`${ruta}/`),
+    );
   };
 
   // ==========================================
@@ -206,6 +209,25 @@ function Navbar() {
 
             <span>Clientes</span>
           </Link>
+
+          {/* ==================================
+              CONTROL DE ORDEN
+              SOLO EMPRESAS CON MANEJO DE MESAS
+          ================================== */}
+
+          {empresa?.manejo_mesas === true && (
+            <Link
+              to="/control-orden"
+              className={`sidebar-link ${
+                estaActivo("/control-orden") ? "sidebar-link-active" : ""
+              }`}
+              onClick={() => setSidebarAbierto(false)}
+            >
+              <span className="sidebar-icon">🍽️</span>
+
+              <span>Control de Orden</span>
+            </Link>
+          )}
 
           {/* ==================================
               FACTURACIÓN

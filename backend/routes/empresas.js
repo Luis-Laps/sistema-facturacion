@@ -1,11 +1,7 @@
 const express = require("express");
-
 const router = express.Router();
-
 const pool = require("../db/conexion");
-
 const bcrypt = require("bcrypt");
-
 const validarToken = require("../middleware/auth");
 
 // ==========================================
@@ -31,6 +27,7 @@ router.get("/", validarToken, async (req, res) => {
         correo,
         logo_url,
         color_principal,
+        propina_ley,
         activo,
         fecha_vencimiento,
         created_at
@@ -40,7 +37,7 @@ router.get("/", validarToken, async (req, res) => {
 
     res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    console.error("Error al obtener empresas:", error);
 
     res.status(500).json({
       mensaje: "Error al obtener empresas",
@@ -71,6 +68,7 @@ router.post("/", validarToken, async (req, res) => {
       correo,
       logo_url,
       color_principal,
+      propina_ley,
       admin_nombre,
       admin_usuario,
       admin_password,
@@ -144,10 +142,11 @@ router.post("/", validarToken, async (req, res) => {
         correo,
         logo_url,
         color_principal,
+        propina_ley,
         activo
       )
       VALUES
-      ($1, $2, $3, $4, $5, $6, $7, true)
+      ($1, $2, $3, $4, $5, $6, $7, $8, true)
       RETURNING *
       `,
       [
@@ -158,6 +157,7 @@ router.post("/", validarToken, async (req, res) => {
         correo || null,
         logo_url || null,
         color_principal || "#198754",
+        propina_ley === true,
       ],
     );
 

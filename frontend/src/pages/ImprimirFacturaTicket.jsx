@@ -199,26 +199,81 @@ function ImprimirFacturaTicket() {
       {/* TOTAL */}
       {/* ====================================== */}
 
-      <div
-        className="total"
-        style={{
-          borderColor: colorPrincipal,
-        }}
-      >
-        <div className="titulo-total">TOTAL</div>
+      {/* ======================================
+    RESUMEN DE FACTURA
+====================================== */}
+
+      <div className="resumen-ticket">
+        <div className="fila">
+          <span>Subtotal</span>
+          <span>
+            RD${" "}
+            {Number(
+              factura.detalle.reduce(
+                (total, item) => total + Number(item.subtotal || 0),
+                0,
+              ),
+            ).toLocaleString("es-DO", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        </div>
+
+        {Number(factura.factura.propina || 0) > 0 && (
+          <div className="fila">
+            <span>Propina de ley (10%)</span>
+            <span>
+              RD${" "}
+              {Number(factura.factura.propina).toLocaleString("es-DO", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+        )}
 
         <div
-          className="monto-total"
+          className="total"
           style={{
-            color: colorPrincipal,
+            borderColor: colorPrincipal,
           }}
         >
-          RD${" "}
-          {Number(factura.factura.total).toLocaleString("es-DO", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+          <div className="titulo-total">TOTAL</div>
+
+          <div
+            className="monto-total"
+            style={{
+              color: colorPrincipal,
+            }}
+          >
+            RD${" "}
+            {Number(factura.factura.total).toLocaleString("es-DO", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </div>
         </div>
+      </div>
+
+      <hr />
+
+      {/* ======================================
+    FORMA DE PAGO
+====================================== */}
+
+      <div className="fila forma-pago">
+        <strong>Forma de pago</strong>
+
+        <span>
+          {factura.factura.forma_pago === "EFECTIVO"
+            ? "💵 Efectivo"
+            : factura.factura.forma_pago === "TARJETA"
+              ? "💳 Tarjeta"
+              : factura.factura.forma_pago === "TRANSFERENCIA"
+                ? "🏦 Transferencia"
+                : factura.factura.forma_pago || "No especificada"}
+        </span>
       </div>
 
       <hr />

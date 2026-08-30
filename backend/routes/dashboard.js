@@ -12,15 +12,19 @@ const validarToken = require("../middleware/auth");
 
 router.get("/", validarToken, async (req, res) => {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const obtenerFechaLocal = (fecha = new Date()) => {
+      const year = fecha.getFullYear();
+      const month = String(fecha.getMonth() + 1).padStart(2, "0");
+      const day = String(fecha.getDate()).padStart(2, "0");
 
-    const primerDiaMes = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth(),
-      1,
-    )
-      .toISOString()
-      .split("T")[0];
+      return `${year}-${month}-${day}`;
+    };
+
+    const hoy = obtenerFechaLocal();
+
+    const primerDiaMes = obtenerFechaLocal(
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    );
 
     const { desde = primerDiaMes, hasta = hoy } = req.query;
 
@@ -46,10 +50,11 @@ router.get("/", validarToken, async (req, res) => {
 
     const clientes = await pool.query(
       `
-      SELECT COUNT(*) AS total
-      FROM clientes
-      WHERE empresa_id = $1
-      `,
+  SELECT COUNT(*) AS total
+  FROM clientes
+  WHERE empresa_id = $1
+  AND activo = TRUE
+  `,
       [empresaId],
     );
 
@@ -59,11 +64,12 @@ router.get("/", validarToken, async (req, res) => {
 
     const facturas = await pool.query(
       `
-      SELECT COUNT(*) AS total
-      FROM facturas
-      WHERE empresa_id = $1
-      AND DATE(fecha) BETWEEN $2 AND $3
-      `,
+  SELECT COUNT(*) AS total
+  FROM facturas
+  WHERE empresa_id = $1
+  AND fecha >= $2::date
+  AND fecha < ($3::date + INTERVAL '1 day')
+  `,
       [empresaId, desde, hasta],
     );
 
@@ -73,11 +79,12 @@ router.get("/", validarToken, async (req, res) => {
 
     const ventas = await pool.query(
       `
-      SELECT COALESCE(SUM(total), 0) AS total
-      FROM facturas
-      WHERE empresa_id = $1
-      AND DATE(fecha) BETWEEN $2 AND $3
-      `,
+  SELECT COALESCE(SUM(total), 0) AS total
+  FROM facturas
+  WHERE empresa_id = $1
+  AND fecha >= $2::date
+  AND fecha < ($3::date + INTERVAL '1 day')
+  `,
       [empresaId, desde, hasta],
     );
 
@@ -123,7 +130,8 @@ router.get("/", validarToken, async (req, res) => {
         AND p.empresa_id = $1
 
       WHERE f.empresa_id = $1
-      AND DATE(f.fecha) BETWEEN $2 AND $3
+      AND f.fecha >= $2::date
+      AND f.fecha < ($3::date + INTERVAL '1 day')
       `,
       [empresaId, desde, hasta],
     );
@@ -139,7 +147,8 @@ router.get("/", validarToken, async (req, res) => {
         COALESCE(SUM(total), 0) AS total
       FROM facturas
       WHERE empresa_id = $1
-      AND DATE(fecha) BETWEEN $2 AND $3
+      AND fecha >= $2::date
+      AND fecha < ($3::date + INTERVAL '1 day')
       GROUP BY DATE(fecha)
       ORDER BY DATE(fecha) ASC
       `,

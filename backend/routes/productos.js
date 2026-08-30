@@ -71,11 +71,44 @@ router.get("/", validarToken, async (req, res) => {
 
     const totalRegistros = Number(total.rows[0].total);
 
+    const resumenInventario = await pool.query(
+      `
+  SELECT
+    COALESCE(
+      SUM(costo_compra * stock)
+      FILTER (WHERE tipo = 'PRODUCTO' AND stock > 0),
+      0
+    ) AS inversion,
+
+    COALESCE(
+      SUM(
+        (precio_venta - costo_compra) * stock
+      )
+      FILTER (WHERE tipo = 'PRODUCTO' AND stock > 0),
+      0
+    ) AS ganancia_proyectada,
+
+    COALESCE(
+      SUM(precio_venta * stock)
+      FILTER (WHERE tipo = 'PRODUCTO' AND stock > 0),
+      0
+    ) AS valor_total
+  FROM productos
+  WHERE empresa_id = $1
+  AND activo = TRUE
+  `,
+      [req.usuario.empresa_id],
+    );
+
     res.json({
       data: result.rows,
       total: totalRegistros,
       page: pagina,
       totalPages: Math.ceil(totalRegistros / limite),
+
+      inversion: Number(resumenInventario.rows[0].inversion),
+      gananciaProyectada: Number(resumenInventario.rows[0].ganancia_proyectada),
+      valorTotal: Number(resumenInventario.rows[0].valor_total),
     });
   } catch (error) {
     console.error(error);
@@ -103,7 +136,7 @@ router.post("/", validarToken, async (req, res) => {
       tipo,
     } = req.body;
 
-    if (!codigo || !nombre || !categoria_id) {
+    if (!nombre || !categoria_id || (tipo === "PRODUCTO" && !codigo)) {
       return res.status(400).json({
         mensaje: "Complete todos los campos obligatorios.",
       });
@@ -150,21 +183,22 @@ router.post("/", validarToken, async (req, res) => {
     // ==========================================
     // VERIFICAR CÓDIGO EN ESTA EMPRESA
     // ==========================================
+    if (tipo === "PRODUCTO") {
+      const existe = await pool.query(
+        `
+    SELECT id
+    FROM productos
+    WHERE codigo = $1
+    AND empresa_id = $2
+    `,
+        [codigo, req.usuario.empresa_id],
+      );
 
-    const existe = await pool.query(
-      `
-      SELECT id
-      FROM productos
-      WHERE codigo = $1
-      AND empresa_id = $2
-      `,
-      [codigo, req.usuario.empresa_id],
-    );
-
-    if (existe.rows.length > 0) {
-      return res.status(400).json({
-        mensaje: "Ya existe un producto con ese código en esta empresa.",
-      });
+      if (existe.rows.length > 0) {
+        return res.status(400).json({
+          mensaje: "Ya existe un producto con ese código en esta empresa.",
+        });
+      }
     }
 
     // ==========================================

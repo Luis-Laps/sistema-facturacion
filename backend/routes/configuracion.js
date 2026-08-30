@@ -30,17 +30,19 @@ router.get("/", validarToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        id,
-        nombre,
-        rnc,
-        telefono,
-        direccion,
-        correo,
-        logo_url,
-        color_principal,
-        activo,
-        fecha_vencimiento
-      FROM empresas
+  id,
+  nombre,
+  rnc,
+  telefono,
+  direccion,
+  correo,
+  logo_url,
+  color_principal,
+  propina_ley,
+  manejo_mesas,
+  activo,
+  fecha_vencimiento
+FROM empresas
       WHERE id = $1
       `,
       [req.usuario.empresa_id],
@@ -54,7 +56,7 @@ router.get("/", validarToken, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error(error);
+    console.error("Error al obtener configuración:", error);
 
     res.status(500).json({
       mensaje: "Error al obtener configuración",
@@ -77,7 +79,12 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
       correo,
       logo_url,
       color_principal,
+      propina_ley,
     } = req.body;
+
+    // ==========================================
+    // VALIDAR NOMBRE
+    // ==========================================
 
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({
@@ -85,30 +92,37 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
       });
     }
 
+    // ==========================================
+    // ACTUALIZAR EMPRESA
+    // ==========================================
+
     const result = await pool.query(
       `
-        UPDATE empresas
-        SET
-          nombre = $1,
-          rnc = $2,
-          telefono = $3,
-          direccion = $4,
-          correo = $5,
-          logo_url = $6,
-          color_principal = $7
-        WHERE id = $8
-        RETURNING
-          id,
-          nombre,
-          rnc,
-          telefono,
-          direccion,
-          correo,
-          logo_url,
-          color_principal,
-          activo,
-          fecha_vencimiento
-        `,
+      UPDATE empresas
+      SET
+        nombre = $1,
+        rnc = $2,
+        telefono = $3,
+        direccion = $4,
+        correo = $5,
+        logo_url = $6,
+        color_principal = $7,
+        propina_ley = $8
+      WHERE id = $9
+     RETURNING
+  id,
+  nombre,
+  rnc,
+  telefono,
+  direccion,
+  correo,
+  logo_url,
+  color_principal,
+  propina_ley,
+  manejo_mesas,
+  activo,
+  fecha_vencimiento
+      `,
       [
         nombre.trim(),
         rnc || null,
@@ -117,6 +131,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
         correo || null,
         logo_url || null,
         color_principal || "#198754",
+        propina_ley === true,
         req.usuario.empresa_id,
       ],
     );
@@ -132,7 +147,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
       empresa: result.rows[0],
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error al guardar configuración:", error);
 
     res.status(500).json({
       mensaje: "Error al guardar configuración",

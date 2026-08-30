@@ -13,6 +13,8 @@ import Usuarios from "./pages/Usuarios";
 import ReportesCaja from "./pages/ReportesCaja";
 import Empresas from "./pages/Empresas";
 import Cotizacion from "./pages/Cotizacion";
+import ControlOrden from "./pages/ControlOrden";
+import MesaOrden from "./pages/MesaOrden";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
@@ -82,6 +84,11 @@ function App() {
                     }
                   />
                   <Route path="/cotizacion" element={<Cotizacion />} />
+                  <Route path="/control-orden" element={<ControlOrden />} />
+                  <Route
+                    path="/control-orden/mesa/:mesaId"
+                    element={<MesaOrden />}
+                  />
                 </Routes>
               </main>
             </div>

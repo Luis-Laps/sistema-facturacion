@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 function Facturas() {
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [empresa, setEmpresa] = useState(null);
+
   const navigate = useNavigate();
 
   const [clienteId, setClienteId] = useState("");
@@ -19,6 +21,12 @@ function Facturas() {
 
   const [formaPago, setFormaPago] = useState("EFECTIVO");
 
+  // ==========================================
+  // PROPINA DE LEY
+  // ==========================================
+
+  const [aplicarPropina, setAplicarPropina] = useState(false);
+
   const [detalle, setDetalle] = useState([]);
   const [mostrarModalServicio, setMostrarModalServicio] = useState(false);
 
@@ -30,6 +38,10 @@ function Facturas() {
     descuento: 0,
   });
 
+  // ==========================================
+  // CARGAR DATOS
+  // ==========================================
+
   const cargarDatos = async () => {
     try {
       const clientesRes = await api.get("/clientes");
@@ -37,12 +49,24 @@ function Facturas() {
       // Traemos todos los productos para facturar
       const productosRes = await api.get("/productos?page=1&limit=10000");
 
+      // Configuración de la empresa actual
+      const empresaRes = await api.get("/configuracion");
+
       setClientes(clientesRes.data);
       setProductos(productosRes.data.data);
+      setEmpresa(empresaRes.data);
+
+      // Cada vez que cargamos una empresa,
+      // la propina comienza desactivada.
+      setAplicarPropina(false);
     } catch (error) {
-      console.error(error);
+      console.error("Error al cargar datos:", error);
     }
   };
+
+  // ==========================================
+  // PRODUCTOS FILTRADOS
+  // ==========================================
 
   const productosFiltrados = productos.filter((producto) => {
     const texto = busquedaProducto.trim().toLowerCase();
@@ -55,9 +79,17 @@ function Facturas() {
     );
   });
 
+  // ==========================================
+  // CARGAR AL INICIAR
+  // ==========================================
+
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // ==========================================
+  // AGREGAR PRODUCTO
+  // ==========================================
 
   const agregarProducto = () => {
     if (!productoId) {
@@ -84,7 +116,7 @@ function Facturas() {
       producto_id: producto.id,
       descripcion: producto.nombre,
       costo: Number(producto.costo_compra),
-      precio: Number(precio), // ← usa el precio ingresado
+      precio: Number(precio),
       cantidad: Number(cantidad),
       descuento: Number(descuento || 0),
     };
@@ -93,10 +125,16 @@ function Facturas() {
 
     // Limpiar formulario
     setProductoId("");
+    setBusquedaProducto("");
     setCantidad(1);
     setPrecio("");
     setDescuento(0);
+    setMostrarResultados(false);
   };
+
+  // ==========================================
+  // AGREGAR SERVICIO
+  // ==========================================
 
   const agregarServicio = () => {
     if (!servicio.descripcion.trim()) {
@@ -131,15 +169,48 @@ function Facturas() {
 
     setMostrarModalServicio(false);
   };
+
+  // ==========================================
+  // ELIMINAR ITEM
+  // ==========================================
+
   const eliminarItem = (index) => {
     setDetalle(detalle.filter((_, i) => i !== index));
   };
 
-  const calcularTotal = () => {
+  // ==========================================
+  // SUBTOTAL
+  // ==========================================
+
+  const calcularSubtotal = () => {
     return detalle.reduce((total, item) => {
       return total + item.precio * item.cantidad - item.descuento;
     }, 0);
   };
+
+  // ==========================================
+  // PROPINA
+  // ==========================================
+
+  const calcularPropina = () => {
+    if (!aplicarPropina) {
+      return 0;
+    }
+
+    return calcularSubtotal() * 0.1;
+  };
+
+  // ==========================================
+  // TOTAL FINAL
+  // ==========================================
+
+  const calcularTotal = () => {
+    return calcularSubtotal() + calcularPropina();
+  };
+
+  // ==========================================
+  // FACTURAR
+  // ==========================================
 
   const facturar = async () => {
     try {
@@ -153,9 +224,20 @@ function Facturas() {
         return;
       }
 
+      const subtotal = calcularSubtotal();
+      const propina = calcularPropina();
+      const total = calcularTotal();
+
       const response = await api.post("/facturas", {
         cliente_id: Number(clienteId),
         forma_pago: formaPago,
+
+        // Datos de propina
+        propina_aplicada: aplicarPropina,
+        propina: Number(propina.toFixed(2)),
+
+        // Total final
+        total: Number(total.toFixed(2)),
 
         productos: detalle.map((item) => ({
           tipo: item.tipo,
@@ -172,6 +254,7 @@ function Facturas() {
 
       setClienteId("");
       setDetalle([]);
+      setAplicarPropina(false);
 
       const imprimir = window.confirm(
         `Factura #${facturaId} creada correctamente.\n\n¿Desea imprimirla ahora?`,
@@ -193,6 +276,10 @@ function Facturas() {
 
       <div className="container mt-4">
         <h2>Facturación</h2>
+
+        {/* ==========================================
+            CLIENTE Y FORMA DE PAGO
+        ========================================== */}
 
         <div className="card p-3 mb-4">
           <h5>Cliente</h5>
@@ -227,7 +314,41 @@ function Facturas() {
             </select>
           </div>
 
+          {/* ==========================================
+              PROPINA DE LEY
+          ========================================== */}
+
+          {empresa?.propina_ley === true && (
+            <div className="border rounded p-3 mb-3">
+              <div className="form-check">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="aplicarPropina"
+                  checked={aplicarPropina}
+                  onChange={(e) => setAplicarPropina(e.target.checked)}
+                />
+
+                <label
+                  className="form-check-label fw-semibold"
+                  htmlFor="aplicarPropina"
+                >
+                  Aplicar propina de ley (10%)
+                </label>
+              </div>
+
+              <small className="text-muted">
+                La propina se calcula sobre el subtotal de esta factura.
+              </small>
+            </div>
+          )}
+
+          {/* ==========================================
+              AGREGAR PRODUCTO
+          ========================================== */}
+
           <h5>Agregar Producto</h5>
+
           <div className="position-relative mb-2">
             <input
               type="text"
@@ -268,10 +389,13 @@ function Facturas() {
                       className="w-100 text-start border-0 bg-white p-2"
                       onClick={() => {
                         setProductoId(String(producto.id));
+
                         setBusquedaProducto(
                           `${producto.codigo} — ${producto.nombre}`,
                         );
+
                         setPrecio(producto.precio_venta);
+
                         setMostrarResultados(false);
                       }}
                     >
@@ -290,6 +414,7 @@ function Facturas() {
               </div>
             )}
           </div>
+
           <input
             type="number"
             className="form-control mb-2"
@@ -318,6 +443,11 @@ function Facturas() {
             Agregar Producto
           </button>
         </div>
+
+        {/* ==========================================
+            BOTONES
+        ========================================== */}
+
         <div className="d-flex gap-2 mt-2">
           <button className="btn btn-primary" onClick={agregarProducto}>
             Agregar Producto
@@ -331,14 +461,23 @@ function Facturas() {
           </button>
         </div>
 
+        {/* ==========================================
+            DETALLE DE FACTURA
+        ========================================== */}
+
         <table className="table table-bordered">
           <thead>
             <tr>
               <th>Producto</th>
+
               <th className="text-end">Precio</th>
+
               <th className="text-center">Cantidad</th>
+
               <th className="text-end">Descuento</th>
+
               <th className="text-end">Subtotal</th>
+
               <th width="80" className="text-center">
                 Acción
               </th>
@@ -361,13 +500,21 @@ function Facturas() {
                   </td>
 
                   <td className="text-end">
-                    RD$ {Number(item.precio).toLocaleString("es-DO")}
+                    RD${" "}
+                    {Number(item.precio).toLocaleString("es-DO", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
 
                   <td className="text-center">{item.cantidad}</td>
 
                   <td className="text-end">
-                    RD$ {Number(item.descuento).toLocaleString("es-DO")}
+                    RD${" "}
+                    {Number(item.descuento).toLocaleString("es-DO", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
 
                   <td className="text-end">
@@ -375,7 +522,10 @@ function Facturas() {
                     {(
                       item.precio * item.cantidad -
                       item.descuento
-                    ).toLocaleString("es-DO")}
+                    ).toLocaleString("es-DO", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
 
                   <td className="text-center">
@@ -392,12 +542,51 @@ function Facturas() {
           </tbody>
         </table>
 
-        <h4>Total: ${calcularTotal().toFixed(2)}</h4>
+        {/* ==========================================
+            RESUMEN
+        ========================================== */}
 
-        <button className="btn btn-success" onClick={facturar}>
+        <div className="d-flex flex-column align-items-end mt-4">
+          <div>
+            <strong>
+              Subtotal: RD${" "}
+              {calcularSubtotal().toLocaleString("es-DO", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </strong>
+          </div>
+
+          {empresa?.propina_ley === true && aplicarPropina && (
+            <div className="mt-2">
+              <strong>
+                Propina (10%): RD${" "}
+                {calcularPropina().toLocaleString("es-DO", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </div>
+          )}
+
+          <h4 className="mt-2">
+            Total: RD${" "}
+            {calcularTotal().toLocaleString("es-DO", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </h4>
+        </div>
+
+        <button className="btn btn-success mt-3" onClick={facturar}>
           Facturar
         </button>
       </div>
+
+      {/* ==========================================
+          MODAL SERVICIO
+      ========================================== */}
+
       {mostrarModalServicio && (
         <div
           className="modal fade show"
@@ -514,7 +703,10 @@ function Facturas() {
                         Number(servicio.costo || 0)) *
                         Number(servicio.cantidad || 1) -
                       Number(servicio.descuento || 0)
-                    ).toLocaleString("es-DO")}
+                    ).toLocaleString("es-DO", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </h2>
                 </div>
               </div>
