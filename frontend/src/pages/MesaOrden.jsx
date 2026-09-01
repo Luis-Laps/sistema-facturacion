@@ -28,6 +28,8 @@ function MesaOrden() {
   const [cerrandoCuenta, setCerrandoCuenta] = useState(false);
   const [propinaLeyHabilitada, setPropinaLeyHabilitada] = useState(false);
   const [propinaAplicada, setPropinaAplicada] = useState(false);
+  const [itbisLeyHabilitado, setItbisLeyHabilitado] = useState(false);
+  const [itbisAplicado, setItbisAplicado] = useState(false);
 
   // ==========================================
   // CUENTA SELECCIONADA
@@ -253,10 +255,12 @@ function MesaOrden() {
         const response = await api.get("/configuracion");
 
         setPropinaLeyHabilitada(response.data?.propina_ley === true);
+        setItbisLeyHabilitado(response.data?.itbis_ley === true);
       } catch (error) {
         console.error("Error al cargar configuración:", error);
 
         setPropinaLeyHabilitada(false);
+        setItbisLeyHabilitado(false);
       }
     };
 
@@ -280,6 +284,7 @@ function MesaOrden() {
 
     setFormaPago("EFECTIVO");
     setPropinaAplicada(false);
+    setItbisAplicado(false);
     setMostrarCerrar(true);
   };
 
@@ -300,6 +305,7 @@ function MesaOrden() {
         {
           forma_pago: formaPago,
           propina_aplicada: propinaAplicada,
+          itbis_aplicado: itbisAplicado,
         },
       );
 
@@ -432,7 +438,11 @@ function MesaOrden() {
 
   const montoPropina = propinaAplicada ? subtotalCuenta * 0.1 : 0;
 
-  const totalConPropina = subtotalCuenta + montoPropina;
+  const montoItbis = itbisAplicado
+    ? Math.round(subtotalCuenta * 0.18 * 100) / 100
+    : 0;
+
+  const totalConPropina = subtotalCuenta + montoPropina + montoItbis;
 
   if (cargando) {
     return (
@@ -988,6 +998,22 @@ function MesaOrden() {
                     <label className="form-check-label" htmlFor="propinaLey">
                       Aplicar propina de ley (10%)
                     </label>
+                    {itbisLeyHabilitado && (
+                      <div className="form-check mt-3">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="itbisLey"
+                          checked={itbisAplicado}
+                          onChange={(e) => setItbisAplicado(e.target.checked)}
+                          disabled={cerrandoCuenta}
+                        />
+
+                        <label className="form-check-label" htmlFor="itbisLey">
+                          Aplicar ITBIS (18%)
+                        </label>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="mt-4 border-top pt-3">
@@ -1000,6 +1026,13 @@ function MesaOrden() {
                     <div className="d-flex justify-content-between mb-2">
                       <span>Propina de ley (10%)</span>
                       <strong>RD$ {formatearMoneda(montoPropina)}</strong>
+                    </div>
+                  )}
+
+                  {itbisAplicado && (
+                    <div className="d-flex justify-content-between mb-2">
+                      <span>ITBIS (18%)</span>
+                      <strong>RD$ {formatearMoneda(montoItbis)}</strong>
                     </div>
                   )}
 

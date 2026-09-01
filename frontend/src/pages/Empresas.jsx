@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-
-import Navbar from "../components/Navbar";
-
 import api from "../services/api";
 
 function Empresas() {
@@ -9,6 +6,16 @@ function Empresas() {
   const [cargando, setCargando] = useState(true);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  // ==========================================
+  // EMPRESA EN EDICIÓN
+  // ==========================================
+
+  const [empresaEditando, setEmpresaEditando] = useState(null);
+
+  // ==========================================
+  // FORMULARIO
+  // ==========================================
 
   const [form, setForm] = useState({
     nombre: "",
@@ -19,9 +26,11 @@ function Empresas() {
     logo_url: "",
     color_principal: "#198754",
 
-    // Características de la empresa
+    // Características
     propina_ley: false,
+    itbis_ley: false,
 
+    // Administrador
     admin_nombre: "",
     admin_usuario: "",
     admin_password: "",
@@ -38,6 +47,10 @@ function Empresas() {
       setEmpresas(response.data);
     } catch (error) {
       console.error("Error al cargar empresas:", error);
+
+      alert(
+        error.response?.data?.mensaje || "No fue posible cargar las empresas.",
+      );
     } finally {
       setCargando(false);
     }
@@ -54,17 +67,19 @@ function Empresas() {
   const cambiarCampo = (e) => {
     const { name, type, checked, value } = e.target;
 
-    setForm({
-      ...form,
+    setForm((anterior) => ({
+      ...anterior,
       [name]: type === "checkbox" ? checked : value,
-    });
+    }));
   };
 
   // ==========================================
-  // ABRIR FORMULARIO
+  // FORMULARIO NUEVA EMPRESA
   // ==========================================
 
   const abrirFormulario = () => {
+    setEmpresaEditando(null);
+
     setForm({
       nombre: "",
       rnc: "",
@@ -74,9 +89,37 @@ function Empresas() {
       logo_url: "",
       color_principal: "#198754",
 
-      // Características
       propina_ley: false,
+      itbis_ley: false,
 
+      admin_nombre: "",
+      admin_usuario: "",
+      admin_password: "",
+    });
+
+    setMostrarFormulario(true);
+  };
+
+  // ==========================================
+  // FORMULARIO EDITAR EMPRESA
+  // ==========================================
+
+  const abrirEditar = (empresa) => {
+    setEmpresaEditando(empresa);
+
+    setForm({
+      nombre: empresa.nombre || "",
+      rnc: empresa.rnc || "",
+      telefono: empresa.telefono || "",
+      direccion: empresa.direccion || "",
+      correo: empresa.correo || "",
+      logo_url: empresa.logo_url || "",
+      color_principal: empresa.color_principal || "#198754",
+
+      propina_ley: empresa.propina_ley === true,
+      itbis_ley: empresa.itbis_ley === true,
+
+      // No se modifican desde editar empresa
       admin_nombre: "",
       admin_usuario: "",
       admin_password: "",
@@ -93,10 +136,12 @@ function Empresas() {
     if (guardando) return;
 
     setMostrarFormulario(false);
+    setEmpresaEditando(null);
   };
 
   // ==========================================
   // GUARDAR EMPRESA
+  // CREAR / EDITAR
   // ==========================================
 
   const guardarEmpresa = async () => {
@@ -105,36 +150,152 @@ function Empresas() {
       return;
     }
 
-    if (!form.admin_nombre.trim()) {
-      alert("Debe indicar el nombre del administrador.");
-      return;
+    // ==========================================
+    // VALIDACIONES SOLO PARA CREAR
+    // ==========================================
+
+    if (!empresaEditando) {
+      if (!form.admin_nombre.trim()) {
+        alert("Debe indicar el nombre del administrador.");
+        return;
+      }
+
+      if (!form.admin_usuario.trim()) {
+        alert("Debe indicar el usuario del administrador.");
+        return;
+      }
+
+      if (!form.admin_password) {
+        alert("Debe indicar la contraseña del administrador.");
+        return;
+      }
     }
 
-    if (!form.admin_usuario.trim()) {
-      alert("Debe indicar el usuario del administrador.");
-      return;
-    }
+    try {
+      setGuardando(true);
 
-    if (!form.admin_password) {
-      alert("Debe indicar la contraseña del administrador.");
+      // ==========================================
+      // EDITAR
+      // ==========================================
+
+      if (empresaEditando) {
+        await api.put(`/empresas/${empresaEditando.id}`, {
+          nombre: form.nombre,
+          rnc: form.rnc,
+          telefono: form.telefono,
+          direccion: form.direccion,
+          correo: form.correo,
+          logo_url: form.logo_url,
+          color_principal: form.color_principal,
+          propina_ley: form.propina_ley,
+          itbis_ley: form.itbis_ley,
+        });
+
+        alert("Empresa actualizada correctamente.");
+      } else {
+        // ==========================================
+        // CREAR
+        // ==========================================
+
+        await api.post("/empresas", form);
+
+        alert("Empresa creada correctamente.");
+      }
+
+      setMostrarFormulario(false);
+      setEmpresaEditando(null);
+
+      await cargarEmpresas();
+    } catch (error) {
+      console.error(
+        empresaEditando
+          ? "Error al editar empresa:"
+          : "Error al crear empresa:",
+        error,
+      );
+
+      alert(
+        error.response?.data?.mensaje ||
+          (empresaEditando
+            ? "No fue posible actualizar la empresa."
+            : "No fue posible crear la empresa."),
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // ==========================================
+  // ELIMINAR EMPRESA
+  // DESACTIVACIÓN LÓGICA
+  // ==========================================
+
+  const eliminarEmpresa = async (empresa) => {
+    const confirmar = window.confirm(
+      `¿Está seguro de eliminar la empresa "${empresa.nombre}"?\n\n` +
+        "La empresa será desactivada y no se eliminarán sus datos históricos.",
+    );
+
+    if (!confirmar) {
       return;
     }
 
     try {
       setGuardando(true);
 
-      await api.post("/empresas", form);
+      await api.delete(`/empresas/${empresa.id}`);
 
-      alert("Empresa creada correctamente.");
-
-      setMostrarFormulario(false);
+      alert("Empresa eliminada correctamente.");
 
       await cargarEmpresas();
     } catch (error) {
-      console.error("Error al crear empresa:", error);
+      console.error("Error al eliminar empresa:", error);
 
       alert(
-        error.response?.data?.mensaje || "No fue posible crear la empresa.",
+        error.response?.data?.mensaje || "No fue posible eliminar la empresa.",
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // ==========================================
+  // REACTIVAR EMPRESA
+  // ==========================================
+
+  const reactivarEmpresa = async (empresa) => {
+    const confirmar = window.confirm(
+      `¿Desea reactivar la empresa "${empresa.nombre}"?`,
+    );
+
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      setGuardando(true);
+
+      await api.put(`/empresas/${empresa.id}`, {
+        nombre: empresa.nombre,
+        rnc: empresa.rnc,
+        telefono: empresa.telefono,
+        direccion: empresa.direccion,
+        correo: empresa.correo,
+        logo_url: empresa.logo_url,
+        color_principal: empresa.color_principal,
+        propina_ley: empresa.propina_ley === true,
+        itbis_ley: empresa.itbis_ley === true,
+        activo: true,
+      });
+
+      alert("Empresa reactivada correctamente.");
+
+      await cargarEmpresas();
+    } catch (error) {
+      console.error("Error al reactivar empresa:", error);
+
+      alert(
+        error.response?.data?.mensaje || "No fue posible reactivar la empresa.",
       );
     } finally {
       setGuardando(false);
@@ -143,8 +304,6 @@ function Empresas() {
 
   return (
     <>
-      <Navbar />
-
       <div className="container mt-4">
         {/* ==========================================
             ENCABEZADO
@@ -159,7 +318,11 @@ function Empresas() {
             </p>
           </div>
 
-          <button className="btn btn-success" onClick={abrirFormulario}>
+          <button
+            className="btn btn-success"
+            onClick={abrirFormulario}
+            disabled={guardando}
+          >
             + Nueva empresa
           </button>
         </div>
@@ -183,6 +346,7 @@ function Empresas() {
                       <th>Teléfono</th>
                       <th>Correo</th>
                       <th>Estado</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
 
@@ -209,11 +373,44 @@ function Empresas() {
                               <span className="badge bg-danger">Inactiva</span>
                             )}
                           </td>
+
+                          <td>
+                            <div className="d-flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => abrirEditar(empresa)}
+                                disabled={guardando}
+                              >
+                                ✏️ Editar
+                              </button>
+
+                              {empresa.activo ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-danger btn-sm"
+                                  onClick={() => eliminarEmpresa(empresa)}
+                                  disabled={guardando}
+                                >
+                                  🗑️ Eliminar
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-success btn-sm"
+                                  onClick={() => reactivarEmpresa(empresa)}
+                                  disabled={guardando}
+                                >
+                                  ↻ Reactivar
+                                </button>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" className="text-center">
+                        <td colSpan="7" className="text-center">
                           No hay empresas registradas
                         </td>
                       </tr>
@@ -224,267 +421,315 @@ function Empresas() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* ==========================================
-          MODAL NUEVA EMPRESA
-      ========================================== */}
+        {/* ==========================================
+            MODAL
+            NUEVA / EDITAR EMPRESA
+        ========================================== */}
 
-      {mostrarFormulario && (
-        <div
-          className="modal d-block"
-          tabIndex="-1"
-          style={{
-            backgroundColor: "rgba(0,0,0,0.5)",
-          }}
-        >
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content">
-              {/* HEADER */}
-
-              <div className="modal-header">
-                <h5 className="modal-title">Nueva empresa</h5>
-
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={cerrarFormulario}
-                ></button>
-              </div>
-
-              {/* BODY */}
-
-              <div className="modal-body">
+        {mostrarFormulario && (
+          <div
+            className="modal d-block"
+            tabIndex="-1"
+            style={{
+              backgroundColor: "rgba(0,0,0,0.5)",
+            }}
+          >
+            <div className="modal-dialog modal-lg modal-dialog-centered">
+              <div className="modal-content">
                 {/* ==========================================
-                    INFORMACIÓN DE LA EMPRESA
+                    HEADER
                 ========================================== */}
 
-                <h6 className="mb-3">Información de la empresa</h6>
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    {empresaEditando ? "Editar empresa" : "Nueva empresa"}
+                  </h5>
 
-                <div className="row">
-                  {/* NOMBRE */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Nombre *</label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="nombre"
-                      value={form.nombre}
-                      onChange={cambiarCampo}
-                      placeholder="Nombre de la empresa"
-                    />
-                  </div>
-
-                  {/* RNC */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">RNC</label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="rnc"
-                      value={form.rnc}
-                      onChange={cambiarCampo}
-                      placeholder="RNC"
-                    />
-                  </div>
-
-                  {/* TELÉFONO */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Teléfono</label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="telefono"
-                      value={form.telefono}
-                      onChange={cambiarCampo}
-                      placeholder="Teléfono"
-                    />
-                  </div>
-
-                  {/* CORREO */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Correo</label>
-
-                    <input
-                      type="email"
-                      className="form-control"
-                      name="correo"
-                      value={form.correo}
-                      onChange={cambiarCampo}
-                      placeholder="correo@empresa.com"
-                    />
-                  </div>
-
-                  {/* DIRECCIÓN */}
-
-                  <div className="col-md-12 mb-3">
-                    <label className="form-label">Dirección</label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="direccion"
-                      value={form.direccion}
-                      onChange={cambiarCampo}
-                      placeholder="Dirección de la empresa"
-                    />
-                  </div>
-
-                  {/* LOGO */}
-
-                  <div className="col-md-8 mb-3">
-                    <label className="form-label">URL del logo</label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="logo_url"
-                      value={form.logo_url}
-                      onChange={cambiarCampo}
-                      placeholder="https://..."
-                    />
-                  </div>
-
-                  {/* COLOR */}
-
-                  <div className="col-md-4 mb-3">
-                    <label className="form-label">Color principal</label>
-
-                    <input
-                      type="color"
-                      className="form-control form-control-color w-100"
-                      name="color_principal"
-                      value={form.color_principal}
-                      onChange={cambiarCampo}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={cerrarFormulario}
+                    disabled={guardando}
+                  ></button>
                 </div>
 
-                <hr />
-
                 {/* ==========================================
-                    CARACTERÍSTICAS
+                    BODY
                 ========================================== */}
 
-                <h6 className="mb-3">Características de la empresa</h6>
+                <div className="modal-body">
+                  {/* ==========================================
+                      INFORMACIÓN DE LA EMPRESA
+                  ========================================== */}
 
-                <div className="card border-0 bg-light mb-4">
-                  <div className="card-body">
-                    <div className="form-check">
+                  <h6 className="mb-3">Información de la empresa</h6>
+
+                  <div className="row">
+                    {/* NOMBRE */}
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Nombre *</label>
+
                       <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="propina_ley"
-                        name="propina_ley"
-                        checked={form.propina_ley}
+                        type="text"
+                        className="form-control"
+                        name="nombre"
+                        value={form.nombre}
+                        onChange={cambiarCampo}
+                        placeholder="Nombre de la empresa"
+                      />
+                    </div>
+
+                    {/* RNC */}
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">RNC</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="rnc"
+                        value={form.rnc}
+                        onChange={cambiarCampo}
+                        placeholder="RNC"
+                      />
+                    </div>
+
+                    {/* TELÉFONO */}
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Teléfono</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="telefono"
+                        value={form.telefono}
+                        onChange={cambiarCampo}
+                        placeholder="Teléfono"
+                      />
+                    </div>
+
+                    {/* CORREO */}
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Correo</label>
+
+                      <input
+                        type="email"
+                        className="form-control"
+                        name="correo"
+                        value={form.correo}
+                        onChange={cambiarCampo}
+                        placeholder="correo@empresa.com"
+                      />
+                    </div>
+
+                    {/* DIRECCIÓN */}
+
+                    <div className="col-md-12 mb-3">
+                      <label className="form-label">Dirección</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="direccion"
+                        value={form.direccion}
+                        onChange={cambiarCampo}
+                        placeholder="Dirección de la empresa"
+                      />
+                    </div>
+
+                    {/* LOGO */}
+
+                    <div className="col-md-8 mb-3">
+                      <label className="form-label">URL del logo</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="logo_url"
+                        value={form.logo_url}
+                        onChange={cambiarCampo}
+                        placeholder="https://..."
+                      />
+                    </div>
+
+                    {/* COLOR */}
+
+                    <div className="col-md-4 mb-3">
+                      <label className="form-label">Color principal</label>
+
+                      <input
+                        type="color"
+                        className="form-control form-control-color w-100"
+                        name="color_principal"
+                        value={form.color_principal}
                         onChange={cambiarCampo}
                       />
-
-                      <label
-                        className="form-check-label fw-semibold"
-                        htmlFor="propina_ley"
-                      >
-                        Habilitar propina de ley (10%)
-                      </label>
-                    </div>
-
-                    <div className="form-text">
-                      Permite que esta empresa pueda aplicar una propina del 10%
-                      individualmente en sus facturas.
                     </div>
                   </div>
-                </div>
 
-                <hr />
+                  <hr />
+
+                  {/* ==========================================
+                      CARACTERÍSTICAS
+                  ========================================== */}
+
+                  <h6 className="mb-3">Características de la empresa</h6>
+
+                  <div className="card border-0 bg-light mb-4">
+                    <div className="card-body">
+                      {/* PROPINA */}
+
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="propina_ley"
+                          name="propina_ley"
+                          checked={form.propina_ley}
+                          onChange={cambiarCampo}
+                        />
+
+                        <label
+                          className="form-check-label fw-semibold"
+                          htmlFor="propina_ley"
+                        >
+                          Habilitar propina de ley (10%)
+                        </label>
+                      </div>
+
+                      <div className="form-text">
+                        Permite que esta empresa pueda aplicar una propina del
+                        10% individualmente en sus facturas.
+                      </div>
+
+                      <hr />
+
+                      {/* ITBIS */}
+
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="itbis_ley"
+                          name="itbis_ley"
+                          checked={form.itbis_ley}
+                          onChange={cambiarCampo}
+                        />
+
+                        <label
+                          className="form-check-label fw-semibold"
+                          htmlFor="itbis_ley"
+                        >
+                          Habilitar ITBIS (18%)
+                        </label>
+                      </div>
+
+                      <div className="form-text">
+                        Permite que esta empresa pueda aplicar un ITBIS del 18%
+                        individualmente en sus facturas.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ==========================================
+                      ADMINISTRADOR
+                      SOLO AL CREAR
+                  ========================================== */}
+
+                  {!empresaEditando && (
+                    <>
+                      <h6 className="mb-3">Administrador de la empresa</h6>
+
+                      <div className="row">
+                        {/* NOMBRE ADMIN */}
+
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label">
+                            Nombre del administrador *
+                          </label>
+
+                          <input
+                            type="text"
+                            className="form-control"
+                            name="admin_nombre"
+                            value={form.admin_nombre}
+                            onChange={cambiarCampo}
+                            placeholder="Nombre completo"
+                          />
+                        </div>
+
+                        {/* USUARIO */}
+
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label">Usuario *</label>
+
+                          <input
+                            type="text"
+                            className="form-control"
+                            name="admin_usuario"
+                            value={form.admin_usuario}
+                            onChange={cambiarCampo}
+                            placeholder="usuario"
+                          />
+                        </div>
+
+                        {/* CONTRASEÑA */}
+
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label">Contraseña *</label>
+
+                          <input
+                            type="password"
+                            className="form-control"
+                            name="admin_password"
+                            value={form.admin_password}
+                            onChange={cambiarCampo}
+                            placeholder="Contraseña"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {/* ==========================================
-                    ADMINISTRADOR
+                    FOOTER
                 ========================================== */}
 
-                <h6 className="mb-3">Administrador de la empresa</h6>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={cerrarFormulario}
+                    disabled={guardando}
+                  >
+                    Cancelar
+                  </button>
 
-                <div className="row">
-                  {/* NOMBRE ADMIN */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">
-                      Nombre del administrador *
-                    </label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="admin_nombre"
-                      value={form.admin_nombre}
-                      onChange={cambiarCampo}
-                      placeholder="Nombre completo"
-                    />
-                  </div>
-
-                  {/* USUARIO */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Usuario *</label>
-
-                    <input
-                      type="text"
-                      className="form-control"
-                      name="admin_usuario"
-                      value={form.admin_usuario}
-                      onChange={cambiarCampo}
-                      placeholder="usuario"
-                    />
-                  </div>
-
-                  {/* CONTRASEÑA */}
-
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Contraseña *</label>
-
-                    <input
-                      type="password"
-                      className="form-control"
-                      name="admin_password"
-                      value={form.admin_password}
-                      onChange={cambiarCampo}
-                      placeholder="Contraseña"
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    className={
+                      empresaEditando ? "btn btn-primary" : "btn btn-success"
+                    }
+                    onClick={guardarEmpresa}
+                    disabled={guardando}
+                  >
+                    {guardando
+                      ? "Guardando..."
+                      : empresaEditando
+                        ? "Guardar cambios"
+                        : "Crear empresa"}
+                  </button>
                 </div>
-              </div>
-
-              {/* FOOTER */}
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={cerrarFormulario}
-                  disabled={guardando}
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-success"
-                  onClick={guardarEmpresa}
-                  disabled={guardando}
-                >
-                  {guardando ? "Creando..." : "Crear empresa"}
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }

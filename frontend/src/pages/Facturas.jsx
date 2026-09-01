@@ -27,6 +27,12 @@ function Facturas() {
 
   const [aplicarPropina, setAplicarPropina] = useState(false);
 
+  // ==========================================
+  // ITBIS
+  // ==========================================
+
+  const [aplicarItbis, setAplicarItbis] = useState(false);
+
   const [detalle, setDetalle] = useState([]);
   const [mostrarModalServicio, setMostrarModalServicio] = useState(false);
 
@@ -57,8 +63,9 @@ function Facturas() {
       setEmpresa(empresaRes.data);
 
       // Cada vez que cargamos una empresa,
-      // la propina comienza desactivada.
+      // los impuestos comienzan desactivados.
       setAplicarPropina(false);
+      setAplicarItbis(false);
     } catch (error) {
       console.error("Error al cargar datos:", error);
     }
@@ -201,11 +208,23 @@ function Facturas() {
   };
 
   // ==========================================
+  // ITBIS
+  // ==========================================
+
+  const calcularItbis = () => {
+    if (!aplicarItbis) {
+      return 0;
+    }
+
+    return calcularSubtotal() * 0.18;
+  };
+
+  // ==========================================
   // TOTAL FINAL
   // ==========================================
 
   const calcularTotal = () => {
-    return calcularSubtotal() + calcularPropina();
+    return calcularSubtotal() + calcularItbis() + calcularPropina();
   };
 
   // ==========================================
@@ -226,6 +245,7 @@ function Facturas() {
 
       const subtotal = calcularSubtotal();
       const propina = calcularPropina();
+      const itbis = calcularItbis();
       const total = calcularTotal();
 
       const response = await api.post("/facturas", {
@@ -235,6 +255,10 @@ function Facturas() {
         // Datos de propina
         propina_aplicada: aplicarPropina,
         propina: Number(propina.toFixed(2)),
+
+        // Datos de ITBIS
+        itbis_aplicado: aplicarItbis,
+        itbis: Number(itbis.toFixed(2)),
 
         // Total final
         total: Number(total.toFixed(2)),
@@ -255,6 +279,7 @@ function Facturas() {
       setClienteId("");
       setDetalle([]);
       setAplicarPropina(false);
+      setAplicarItbis(false);
 
       const imprimir = window.confirm(
         `Factura #${facturaId} creada correctamente.\n\n¿Desea imprimirla ahora?`,
@@ -307,9 +332,7 @@ function Facturas() {
               onChange={(e) => setFormaPago(e.target.value)}
             >
               <option value="EFECTIVO">💵 Efectivo</option>
-
               <option value="TARJETA">💳 Tarjeta</option>
-
               <option value="TRANSFERENCIA">🏦 Transferencia</option>
             </select>
           </div>
@@ -339,6 +362,35 @@ function Facturas() {
 
               <small className="text-muted">
                 La propina se calcula sobre el subtotal de esta factura.
+              </small>
+            </div>
+          )}
+
+          {/* ==========================================
+              ITBIS
+          ========================================== */}
+
+          {empresa?.itbis_ley === true && (
+            <div className="border rounded p-3 mb-3">
+              <div className="form-check">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="aplicarItbis"
+                  checked={aplicarItbis}
+                  onChange={(e) => setAplicarItbis(e.target.checked)}
+                />
+
+                <label
+                  className="form-check-label fw-semibold"
+                  htmlFor="aplicarItbis"
+                >
+                  Aplicar ITBIS (18%)
+                </label>
+              </div>
+
+              <small className="text-muted">
+                El ITBIS se calcula sobre el subtotal de esta factura.
               </small>
             </div>
           )}
@@ -556,6 +608,18 @@ function Facturas() {
               })}
             </strong>
           </div>
+
+          {empresa?.itbis_ley === true && aplicarItbis && (
+            <div className="mt-2">
+              <strong>
+                ITBIS (18%): RD${" "}
+                {calcularItbis().toLocaleString("es-DO", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </div>
+          )}
 
           {empresa?.propina_ley === true && aplicarPropina && (
             <div className="mt-2">

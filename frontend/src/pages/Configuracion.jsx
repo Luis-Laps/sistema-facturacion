@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 
-import Navbar from "../components/Navbar";
-
 import api from "../services/api";
 
 function Configuracion() {
@@ -113,8 +111,6 @@ function Configuracion() {
   if (cargando) {
     return (
       <>
-        <Navbar />
-
         <div className="container mt-4">
           <div className="text-center py-5">
             <div className="spinner-border text-success" role="status" />
@@ -132,8 +128,6 @@ function Configuracion() {
 
   return (
     <>
-      <Navbar />
-
       <div className="container mt-4 mb-5">
         <div className="mb-4">
           <h2>Configuración de la empresa</h2>

@@ -39,6 +39,7 @@ router.get("/", validarToken, async (req, res) => {
   logo_url,
   color_principal,
   propina_ley,
+  itbis_ley,
   manejo_mesas,
   activo,
   fecha_vencimiento
@@ -80,6 +81,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
       logo_url,
       color_principal,
       propina_ley,
+      itbis_ley,
     } = req.body;
 
     // ==========================================
@@ -106,9 +108,10 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
         direccion = $4,
         correo = $5,
         logo_url = $6,
-        color_principal = $7,
-        propina_ley = $8
-      WHERE id = $9
+       color_principal = $7,
+      propina_ley = $8,
+      itbis_ley = $9
+      WHERE id = $10
      RETURNING
   id,
   nombre,
@@ -119,6 +122,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
   logo_url,
   color_principal,
   propina_ley,
+  itbis_ley,
   manejo_mesas,
   activo,
   fecha_vencimiento
@@ -132,6 +136,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
         logo_url || null,
         color_principal || "#198754",
         propina_ley === true,
+        itbis_ley === true,
         req.usuario.empresa_id,
       ],
     );

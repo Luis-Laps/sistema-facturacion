@@ -21,10 +21,15 @@ function Navbar() {
   // ==========================================
 
   useEffect(() => {
+    // El SUPER_ADMIN no pertenece a una empresa específica
+    if (rol === "SUPER_ADMIN") {
+      setEmpresa(null);
+      return;
+    }
+
     const cargarEmpresa = async () => {
       try {
         const response = await api.get("/configuracion");
-
         setEmpresa(response.data);
       } catch (error) {
         console.error("Error al cargar empresa:", error);
@@ -32,7 +37,7 @@ function Navbar() {
     };
 
     cargarEmpresa();
-  }, []);
+  }, [rol]);
 
   // ==========================================
   // CERRAR SESIÓN

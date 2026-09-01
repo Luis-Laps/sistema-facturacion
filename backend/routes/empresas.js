@@ -1,7 +1,11 @@
 const express = require("express");
+
 const router = express.Router();
+
 const pool = require("../db/conexion");
+
 const bcrypt = require("bcrypt");
+
 const validarToken = require("../middleware/auth");
 
 // ==========================================
@@ -28,6 +32,7 @@ router.get("/", validarToken, async (req, res) => {
         logo_url,
         color_principal,
         propina_ley,
+        itbis_ley,
         activo,
         fecha_vencimiento,
         created_at
@@ -69,6 +74,7 @@ router.post("/", validarToken, async (req, res) => {
       logo_url,
       color_principal,
       propina_ley,
+      itbis_ley,
       admin_nombre,
       admin_usuario,
       admin_password,
@@ -143,10 +149,11 @@ router.post("/", validarToken, async (req, res) => {
         logo_url,
         color_principal,
         propina_ley,
+        itbis_ley,
         activo
       )
       VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, true)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
       RETURNING *
       `,
       [
@@ -158,6 +165,7 @@ router.post("/", validarToken, async (req, res) => {
         logo_url || null,
         color_principal || "#198754",
         propina_ley === true,
+        itbis_ley === true,
       ],
     );
 
@@ -220,6 +228,189 @@ router.post("/", validarToken, async (req, res) => {
     });
   } finally {
     client.release();
+  }
+});
+
+// ==========================================
+// EDITAR EMPRESA
+// SOLO SUPER ADMIN
+// ==========================================
+
+router.put("/:id", validarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== "SUPER_ADMIN") {
+      return res.status(403).json({
+        mensaje: "No tienes permisos para editar empresas.",
+      });
+    }
+
+    const { id } = req.params;
+
+    const {
+      nombre,
+      rnc,
+      telefono,
+      direccion,
+      correo,
+      logo_url,
+      color_principal,
+      propina_ley,
+      itbis_ley,
+    } = req.body;
+
+    // ==========================================
+    // VALIDAR NOMBRE
+    // ==========================================
+
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({
+        mensaje: "El nombre de la empresa es obligatorio.",
+      });
+    }
+
+    // ==========================================
+    // VERIFICAR EMPRESA
+    // ==========================================
+
+    const empresaExiste = await pool.query(
+      `
+      SELECT id
+      FROM empresas
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    if (empresaExiste.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Empresa no encontrada.",
+      });
+    }
+
+    // ==========================================
+    // ACTUALIZAR EMPRESA
+    // ==========================================
+
+    const result = await pool.query(
+      `
+      UPDATE empresas
+      SET
+        nombre = $1,
+        rnc = $2,
+        telefono = $3,
+        direccion = $4,
+        correo = $5,
+        logo_url = $6,
+        color_principal = $7,
+        propina_ley = $8,
+        itbis_ley = $9
+      WHERE id = $10
+      RETURNING
+        id,
+        nombre,
+        rnc,
+        telefono,
+        direccion,
+        correo,
+        logo_url,
+        color_principal,
+        propina_ley,
+        itbis_ley,
+        activo,
+        fecha_vencimiento,
+        created_at
+      `,
+      [
+        nombre.trim(),
+        rnc || null,
+        telefono || null,
+        direccion || null,
+        correo || null,
+        logo_url || null,
+        color_principal || "#198754",
+        propina_ley === true,
+        itbis_ley === true,
+        id,
+      ],
+    );
+
+    res.json({
+      mensaje: "Empresa actualizada correctamente.",
+      empresa: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error al editar empresa:", error);
+
+    res.status(500).json({
+      mensaje: "Error al editar la empresa.",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
+// ELIMINAR EMPRESA
+// DESACTIVACIÓN LÓGICA
+// SOLO SUPER ADMIN
+// ==========================================
+
+router.delete("/:id", validarToken, async (req, res) => {
+  try {
+    if (req.usuario.rol !== "SUPER_ADMIN") {
+      return res.status(403).json({
+        mensaje: "No tienes permisos para eliminar empresas.",
+      });
+    }
+
+    const { id } = req.params;
+
+    // ==========================================
+    // VERIFICAR EMPRESA
+    // ==========================================
+
+    const empresaExiste = await pool.query(
+      `
+      SELECT id, nombre, activo
+      FROM empresas
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    if (empresaExiste.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Empresa no encontrada.",
+      });
+    }
+
+    // ==========================================
+    // DESACTIVAR EMPRESA
+    // ==========================================
+
+    const result = await pool.query(
+      `
+      UPDATE empresas
+      SET activo = FALSE
+      WHERE id = $1
+      RETURNING
+        id,
+        nombre,
+        activo
+      `,
+      [id],
+    );
+
+    res.json({
+      mensaje: "Empresa eliminada correctamente.",
+      empresa: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error al eliminar empresa:", error);
+
+    res.status(500).json({
+      mensaje: "Error al eliminar la empresa.",
+      error: error.message,
+    });
   }
 });
 

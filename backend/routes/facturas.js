@@ -21,6 +21,7 @@ router.post("/", validarToken, async (req, res) => {
       productos,
       forma_pago = "EFECTIVO",
       propina_aplicada = false,
+      itbis_aplicado = false,
     } = req.body;
 
     // ==========================================
@@ -41,7 +42,8 @@ router.post("/", validarToken, async (req, res) => {
       `
       SELECT
         id,
-        propina_ley
+        propina_ley,
+        itbis_ley
       FROM empresas
       WHERE id = $1
       `,
@@ -68,6 +70,20 @@ router.post("/", validarToken, async (req, res) => {
       }
 
       aplicarPropina = true;
+    }
+
+    // ==========================================
+    // VALIDAR ITBIS
+    // ==========================================
+
+    let aplicarItbis = false;
+
+    if (itbis_aplicado === true) {
+      if (empresa.itbis_ley !== true) {
+        throw new Error("El ITBIS no está habilitado para esta empresa.");
+      }
+
+      aplicarItbis = true;
     }
 
     // ==========================================
@@ -235,11 +251,21 @@ router.post("/", validarToken, async (req, res) => {
     }
 
     // ==========================================
+    // CALCULAR ITBIS
+    // ==========================================
+
+    let itbis = 0;
+
+    if (aplicarItbis) {
+      itbis = Math.round((subtotal * 0.18 + Number.EPSILON) * 100) / 100;
+    }
+
+    // ==========================================
     // CALCULAR TOTAL FINAL
     // ==========================================
 
-    const total = Math.round((subtotal + propina + Number.EPSILON) * 100) / 100;
-
+    const total =
+      Math.round((subtotal + itbis + propina + Number.EPSILON) * 100) / 100;
     console.log("================================");
     console.log("Productos:", productos);
     console.log("Subtotal:", subtotal);
@@ -272,20 +298,24 @@ router.post("/", validarToken, async (req, res) => {
         empresa_id,
         usuario_id,
         propina_aplicada,
-        propina
+        propina,
+        itbis_aplicado,
+        itbis
       )
       VALUES
-      (
-        $1,
-        NOW() AT TIME ZONE 'America/Santo_Domingo',
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8
-      )
+(
+  $1,
+  NOW() AT TIME ZONE 'America/Santo_Domingo',
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9,
+  $10
+)
       RETURNING id
       `,
       [
@@ -297,6 +327,8 @@ router.post("/", validarToken, async (req, res) => {
         req.usuario.id,
         aplicarPropina,
         propina,
+        aplicarItbis,
+        itbis,
       ],
     );
 
@@ -477,6 +509,8 @@ router.post("/", validarToken, async (req, res) => {
     res.status(201).json({
       factura_id: facturaId,
       subtotal,
+      itbis_aplicado: aplicarItbis,
+      itbis,
       propina_aplicada: aplicarPropina,
       propina,
       total,
@@ -503,13 +537,15 @@ router.get("/", validarToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        f.id,
-        f.fecha,
-        f.total,
-        f.forma_pago,
-        f.propina_aplicada,
-        f.propina,
-        c.nombre AS cliente
+      f.id,
+      f.fecha,
+      f.total,
+      f.forma_pago,
+      f.propina_aplicada,
+      f.propina,
+      f.itbis_aplicado,
+      f.itbis,
+      c.nombre AS cliente
       FROM facturas f
       INNER JOIN clientes c
         ON c.id = f.cliente_id
@@ -547,6 +583,8 @@ router.get("/:id", validarToken, async (req, res) => {
         f.forma_pago,
         f.propina_aplicada,
         f.propina,
+        f.itbis_aplicado,
+        f.itbis,
         c.nombre AS cliente,
         u.nombre AS usuario_nombre,
         u.usuario AS usuario

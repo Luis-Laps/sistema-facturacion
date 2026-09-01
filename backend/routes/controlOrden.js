@@ -644,6 +644,7 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     const {
       forma_pago = "EFECTIVO",
       propina_aplicada = false,
+      itbis_aplicado = false,
       cliente_id = null,
     } = req.body;
 
@@ -783,10 +784,11 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
 
     const empresaResult = await client.query(
       `
-          SELECT
-            id,
-            propina_ley
-          FROM empresas
+         SELECT
+          id,
+          propina_ley,
+          itbis_ley
+        FROM empresas
           WHERE id = $1
           `,
       [req.usuario.empresa_id],
@@ -821,11 +823,30 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     }
 
     // ==========================================
+    // ITBIS
+    // ==========================================
+
+    let aplicarItbis = false;
+
+    if (itbis_aplicado === true) {
+      if (empresa.itbis_ley !== true) {
+        throw new Error("El ITBIS no está habilitado para esta empresa.");
+      }
+
+      aplicarItbis = true;
+    }
+
+    let itbis = 0;
+
+    if (aplicarItbis) {
+      itbis = Math.round((subtotal * 0.18 + Number.EPSILON) * 100) / 100;
+    }
+    // ==========================================
     // TOTAL
     // ==========================================
 
-    const total = Math.round((subtotal + propina + Number.EPSILON) * 100) / 100;
-
+    const total =
+      Math.round((subtotal + propina + itbis + Number.EPSILON) * 100) / 100;
     // ==========================================
     // BUSCAR CAJA ABIERTA
     // ==========================================
@@ -904,30 +925,34 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
 
     const facturaResult = await client.query(
       `
-          INSERT INTO facturas (
-            fecha,
-            total,
-            cliente_id,
-            caja_id,
-            forma_pago,
-            empresa_id,
-            usuario_id,
-            propina_aplicada,
-            propina
-          )
-          VALUES (
-            NOW(),
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            $6,
-            $7,
-            $8
-          )
-          RETURNING id
-          `,
+    INSERT INTO facturas (
+      fecha,
+      total,
+      cliente_id,
+      caja_id,
+      forma_pago,
+      empresa_id,
+      usuario_id,
+      propina_aplicada,
+      propina,
+      itbis_aplicado,
+      itbis
+    )
+    VALUES (
+      NOW(),
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      $7,
+      $8,
+      $9,
+      $10
+    )
+    RETURNING id
+  `,
       [
         total,
         clienteId,
@@ -937,6 +962,8 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
         req.usuario.id,
         aplicarPropina,
         propina,
+        aplicarItbis,
+        itbis,
       ],
     );
 
@@ -1146,12 +1173,15 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
       mesa_id: cuenta.mesa_id,
 
       mesa_nombre: cuenta.mesa_nombre,
-
       subtotal,
 
       propina_aplicada: aplicarPropina,
 
       propina,
+
+      itbis_aplicado: aplicarItbis,
+
+      itbis,
 
       total,
 

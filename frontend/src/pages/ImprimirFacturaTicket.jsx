@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
-
 import { useParams } from "react-router-dom";
-
 import "../styles/ticket.css";
-
 import api from "../services/api";
 
 function ImprimirFacturaTicket() {
@@ -90,9 +87,9 @@ function ImprimirFacturaTicket() {
         "--color-principal": colorPrincipal,
       }}
     >
-      {/* ====================================== */}
-      {/* EMPRESA */}
-      {/* ====================================== */}
+      {/* ======================================
+          EMPRESA
+      ====================================== */}
 
       <div className="empresa">
         {empresa.logo_url ? (
@@ -105,35 +102,41 @@ function ImprimirFacturaTicket() {
             }}
           />
         ) : null}
+
         <h2>{empresa.nombre}</h2>
+
         {empresa.rnc && <p>RNC: {empresa.rnc}</p>}
+
         {empresa.direccion && <p>{empresa.direccion}</p>}
+
         {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
+
         {empresa.correo && <p>{empresa.correo}</p>}
+
         <hr />
+
         <h3>{titulo}</h3>
+
         <p className="cajero">
           Cajero:{" "}
           {factura.factura.usuario_nombre ||
             factura.factura.usuario ||
             "No identificado"}
-        </p>{" "}
+        </p>
       </div>
 
-      {/* ====================================== */}
-      {/* INFORMACIÓN FACTURA */}
-      {/* ====================================== */}
+      {/* ======================================
+          INFORMACIÓN FACTURA
+      ====================================== */}
 
       <div className="info-ticket">
         <div className="fila">
           <span>No. Factura</span>
-
           <span>#{factura.factura.id}</span>
         </div>
 
         <div className="fila">
           <span>Cliente</span>
-
           <span>{factura.factura.cliente}</span>
         </div>
 
@@ -151,9 +154,9 @@ function ImprimirFacturaTicket() {
 
       <hr />
 
-      {/* ====================================== */}
-      {/* DETALLE */}
-      {/* ====================================== */}
+      {/* ======================================
+          DETALLE
+      ====================================== */}
 
       {factura.detalle.map((item, index) => (
         <div key={index} className="item">
@@ -195,17 +198,16 @@ function ImprimirFacturaTicket() {
         </div>
       ))}
 
-      {/* ====================================== */}
-      {/* TOTAL */}
-      {/* ====================================== */}
-
       {/* ======================================
-    RESUMEN DE FACTURA
-====================================== */}
+          RESUMEN DE FACTURA
+      ====================================== */}
 
       <div className="resumen-ticket">
+        {/* SUBTOTAL */}
+
         <div className="fila">
           <span>Subtotal</span>
+
           <span>
             RD${" "}
             {Number(
@@ -220,9 +222,32 @@ function ImprimirFacturaTicket() {
           </span>
         </div>
 
+        {/* ======================================
+            ITBIS
+        ====================================== */}
+
+        {Number(factura.factura.itbis || 0) > 0 && (
+          <div className="fila">
+            <span>ITBIS (18%)</span>
+
+            <span>
+              RD${" "}
+              {Number(factura.factura.itbis).toLocaleString("es-DO", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+        )}
+
+        {/* ======================================
+            PROPINA
+        ====================================== */}
+
         {Number(factura.factura.propina || 0) > 0 && (
           <div className="fila">
             <span>Propina de ley (10%)</span>
+
             <span>
               RD${" "}
               {Number(factura.factura.propina).toLocaleString("es-DO", {
@@ -232,6 +257,10 @@ function ImprimirFacturaTicket() {
             </span>
           </div>
         )}
+
+        {/* ======================================
+            TOTAL
+        ====================================== */}
 
         <div
           className="total"
@@ -259,8 +288,8 @@ function ImprimirFacturaTicket() {
       <hr />
 
       {/* ======================================
-    FORMA DE PAGO
-====================================== */}
+          FORMA DE PAGO
+      ====================================== */}
 
       <div className="fila forma-pago">
         <strong>Forma de pago</strong>
@@ -278,9 +307,9 @@ function ImprimirFacturaTicket() {
 
       <hr />
 
-      {/* ====================================== */}
-      {/* FOOTER */}
-      {/* ====================================== */}
+      {/* ======================================
+          FOOTER
+      ====================================== */}
 
       <div className="footer">
         <strong>¡Gracias por su compra!</strong>
