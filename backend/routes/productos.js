@@ -23,7 +23,7 @@ const validarPermisoProductos = (req, res, next) => {
 // LISTAR PRODUCTOS
 // ==========================================
 
-router.get("/", validarToken, validarPermisoProductos, async (req, res) => {
+router.get("/", validarToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, buscar = "" } = req.query;
 

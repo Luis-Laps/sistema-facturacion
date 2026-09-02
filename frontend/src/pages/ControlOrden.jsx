@@ -86,6 +86,56 @@ function ControlOrden() {
     }
   };
 
+
+    // ==========================================
+  // ELIMINAR MESA
+  // ==========================================
+
+  const eliminarMesa = async (mesa) => {
+    const confirmacion = await Swal.fire({
+      icon: "warning",
+      title: "¿Eliminar mesa?",
+      html: `
+        La mesa <strong>${mesa.nombre}</strong> será eliminada de
+        <strong>Control de Orden</strong>.<br><br>
+        El historial de ventas se conservará.
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#dc3545",
+      reverseButtons: true,
+    });
+
+    if (!confirmacion.isConfirmed) {
+      return;
+    }
+
+    try {
+      await api.delete(`/control-orden/mesas/${mesa.id}`);
+
+      await cargarMesas();
+
+      Swal.fire({
+        icon: "success",
+        title: "Mesa eliminada",
+        text: `La mesa "${mesa.nombre}" fue eliminada correctamente.`,
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error al eliminar mesa:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo eliminar",
+        text:
+          error.response?.data?.mensaje ||
+          "Ocurrió un error al eliminar la mesa.",
+      });
+    }
+  };
+
   return (
     <>
       <div className="container-fluid px-4 py-4">
@@ -163,25 +213,34 @@ function ControlOrden() {
                     }}
                   >
                     {/* CABECERA */}
-                    <div
-                      className="p-3"
-                      style={{
-                        backgroundColor: ocupada ? "#fff3f3" : "#f1f9f4",
-                        borderBottom: "1px solid #eee",
-                      }}
-                    >
-                      <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="fw-bold mb-0">{mesa.nombre}</h4>
+               <div className="card-header bg-light border-0 d-flex justify-content-between align-items-center">
+  <div className="d-flex align-items-center gap-2">
+    <h5 className="mb-0 fw-bold">{mesa.nombre}</h5>
 
-                        <span
-                          className={`badge ${
-                            ocupada ? "bg-danger" : "bg-success"
-                          }`}
-                        >
-                          {ocupada ? "OCUPADA" : "LIBRE"}
-                        </span>
-                      </div>
-                    </div>
+    <span
+      className={`badge ${
+        ocupada ? "bg-danger" : "bg-success"
+      }`}
+    >
+      {ocupada ? "OCUPADA" : "LIBRE"}
+    </span>
+  </div>
+
+  {!ocupada && (
+    <button
+      type="button"
+      className="btn btn-link text-danger p-0"
+      title="Eliminar mesa"
+      onClick={() => eliminarMesa(mesa)}
+      style={{
+        fontSize: "1.35rem",
+        lineHeight: 1,
+      }}
+    >
+      🗑️
+    </button>
+  )}
+</div>
 
                     {/* CUERPO */}
                     <div className="card-body p-4">
@@ -224,19 +283,20 @@ function ControlOrden() {
                       )}
                     </div>
 
-                    {/* PIE */}
-                    <div className="card-footer bg-white border-0 p-3">
-                      <button
-                        className={`btn w-100 ${
-                          ocupada ? "btn-primary" : "btn-success"
-                        }`}
-                        onClick={() =>
-                          navigate(`/control-orden/mesa/${mesa.id}`)
-                        }
-                      >
-                        {ocupada ? "Ver orden" : "Abrir orden"}
-                      </button>
-                    </div>
+               {/* PIE */}
+{/* PIE */}
+<div className="card-footer bg-white border-0 p-3">
+  <button
+    className={`btn w-100 ${
+      ocupada ? "btn-primary" : "btn-success"
+    }`}
+    onClick={() =>
+      navigate(`/control-orden/mesa/${mesa.id}`)
+    }
+  >
+    {ocupada ? "Ver orden" : "Abrir orden"}
+  </button>
+</div>
                   </div>
                 </div>
               );

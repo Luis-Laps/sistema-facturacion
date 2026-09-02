@@ -74,6 +74,76 @@ router.get("/mesas", validarToken, async (req, res) => {
 });
 
 // ==========================================
+// ELIMINAR MESA
+// ==========================================
+
+router.delete("/mesas/:mesaId", validarToken, async (req, res) => {
+  try {
+    const { mesaId } = req.params;
+
+    // Verificar que la mesa pertenezca a la empresa
+    const mesaResult = await pool.query(
+      `
+      SELECT id, nombre
+      FROM mesas
+      WHERE
+        id = $1
+        AND empresa_id = $2
+        AND activa = TRUE
+      `,
+      [mesaId, req.usuario.empresa_id],
+    );
+
+    if (mesaResult.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Mesa no encontrada.",
+      });
+    }
+
+    // Una mesa ocupada NO se puede eliminar
+    const cuentaResult = await pool.query(
+      `
+      SELECT id
+      FROM cuentas
+      WHERE
+        mesa_id = $1
+        AND estado = 'ABIERTA'
+      LIMIT 1
+      `,
+      [mesaId],
+    );
+
+    if (cuentaResult.rows.length > 0) {
+      return res.status(400).json({
+        mensaje: "No puedes eliminar una mesa que está ocupada.",
+      });
+    }
+
+    // Desactivar mesa para conservar su historial
+    await pool.query(
+      `
+      UPDATE mesas
+      SET activa = FALSE
+      WHERE
+        id = $1
+        AND empresa_id = $2
+      `,
+      [mesaId, req.usuario.empresa_id],
+    );
+
+    res.json({
+      mensaje: `Mesa "${mesaResult.rows[0].nombre}" eliminada correctamente.`,
+    });
+  } catch (error) {
+    console.error("Error al eliminar mesa:", error);
+
+    res.status(500).json({
+      mensaje: "Error al eliminar la mesa.",
+    });
+  }
+});
+
+// ==========================================
 // CREAR MESA
 // ==========================================
 
