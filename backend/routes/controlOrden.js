@@ -877,46 +877,27 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     // CLIENTE
     // ==========================================
 
-    let clienteId = cliente_id;
+    // ==========================================
+    // CLIENTE
+    // ==========================================
+
+    let clienteId = cliente_id || null;
 
     if (clienteId) {
       const clienteResult = await client.query(
         `
-            SELECT id
-            FROM clientes
-            WHERE
-              id = $1
-              AND empresa_id = $2
-            `,
+      SELECT id
+      FROM clientes
+      WHERE
+        id = $1
+        AND empresa_id = $2
+      `,
         [clienteId, req.usuario.empresa_id],
       );
 
       if (clienteResult.rows.length === 0) {
         throw new Error("El cliente seleccionado no pertenece a esta empresa.");
       }
-    } else {
-      // Si no se seleccionó cliente,
-      // utilizamos el primer cliente
-      // disponible de la empresa.
-
-      const clienteResult = await client.query(
-        `
-            SELECT id
-            FROM clientes
-            WHERE empresa_id = $1
-            ORDER BY id ASC
-            LIMIT 1
-            `,
-        [req.usuario.empresa_id],
-      );
-
-      if (clienteResult.rows.length === 0) {
-        throw new Error(
-          "No existe ningún cliente registrado para esta empresa.",
-        );
-      }
-
-      clienteId = clienteResult.rows[0].id;
     }
 
     // ==========================================

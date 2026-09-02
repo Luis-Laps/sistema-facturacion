@@ -545,11 +545,11 @@ router.get("/", validarToken, async (req, res) => {
       f.propina,
       f.itbis_aplicado,
       f.itbis,
-      c.nombre AS cliente
+COALESCE(c.nombre, 'Consumidor final') AS cliente
       FROM facturas f
-      INNER JOIN clientes c
-        ON c.id = f.cliente_id
-        AND c.empresa_id = f.empresa_id
+      LEFT JOIN clientes c
+  ON c.id = f.cliente_id
+  AND c.empresa_id = f.empresa_id
       WHERE f.empresa_id = $1
       ORDER BY f.id DESC
       `,
@@ -585,12 +585,12 @@ router.get("/:id", validarToken, async (req, res) => {
         f.propina,
         f.itbis_aplicado,
         f.itbis,
-        c.nombre AS cliente,
+        COALESCE(c.nombre, 'Consumidor final') AS cliente,
         u.nombre AS usuario_nombre,
         u.usuario AS usuario
       FROM facturas f
 
-      INNER JOIN clientes c
+      LEFT JOIN clientes c
         ON c.id = f.cliente_id
         AND c.empresa_id = f.empresa_id
 

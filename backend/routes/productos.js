@@ -7,10 +7,23 @@ const pool = require("../db/conexion");
 const validarToken = require("../middleware/auth");
 
 // ==========================================
+// PERMISOS DE PRODUCTOS
+// ==========================================
+
+const validarPermisoProductos = (req, res, next) => {
+  if (req.usuario.rol !== "ADMIN" && req.usuario.rol !== "SUPER_ADMIN") {
+    return res.status(403).json({
+      mensaje: "No tienes permisos para gestionar productos.",
+    });
+  }
+
+  next();
+};
+// ==========================================
 // LISTAR PRODUCTOS
 // ==========================================
 
-router.get("/", validarToken, async (req, res) => {
+router.get("/", validarToken, validarPermisoProductos, async (req, res) => {
   try {
     const { page = 1, limit = 10, buscar = "" } = req.query;
 
@@ -123,7 +136,7 @@ router.get("/", validarToken, async (req, res) => {
 // CREAR PRODUCTO
 // ==========================================
 
-router.post("/", validarToken, async (req, res) => {
+router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
   try {
     const {
       codigo,
@@ -248,7 +261,7 @@ router.post("/", validarToken, async (req, res) => {
 // ACTUALIZAR PRODUCTO
 // ==========================================
 
-router.put("/:id", validarToken, async (req, res) => {
+router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -383,36 +396,41 @@ router.put("/:id", validarToken, async (req, res) => {
 // ELIMINAR PRODUCTO
 // ==========================================
 
-router.delete("/:id", validarToken, async (req, res) => {
-  try {
-    const { id } = req.params;
+router.delete(
+  "/:id",
+  validarToken,
+  validarPermisoProductos,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    const result = await pool.query(
-      `
+      const result = await pool.query(
+        `
         DELETE FROM productos
         WHERE id = $1
         AND empresa_id = $2
         RETURNING id
         `,
-      [id, req.usuario.empresa_id],
-    );
+        [id, req.usuario.empresa_id],
+      );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        mensaje: "Producto no encontrado.",
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          mensaje: "Producto no encontrado.",
+        });
+      }
+
+      res.json({
+        mensaje: "Producto eliminado",
+      });
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        mensaje: "Error al eliminar producto",
       });
     }
-
-    res.json({
-      mensaje: "Producto eliminado",
-    });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      mensaje: "Error al eliminar producto",
-    });
-  }
-});
+  },
+);
 
 module.exports = router;

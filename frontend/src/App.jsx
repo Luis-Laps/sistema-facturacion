@@ -15,7 +15,7 @@ import Empresas from "./pages/Empresas";
 import Cotizacion from "./pages/Cotizacion";
 import ControlOrden from "./pages/ControlOrden";
 import MesaOrden from "./pages/MesaOrden";
-
+import ImprimirCuentaPendiente from "./pages/ImprimirCuentaPendiente";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
 
@@ -62,11 +62,6 @@ function App() {
                   />
 
                   <Route
-                    path="/imprimir-factura/:id"
-                    element={<ImprimirFacturaTicket />}
-                  />
-
-                  <Route
                     path="/usuarios"
                     element={
                       <ProtectedRoute roles={["ADMIN"]}>
@@ -83,11 +78,27 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
+
                   <Route path="/cotizacion" element={<Cotizacion />} />
+
+                  {/* CONTROL DE ORDEN */}
                   <Route path="/control-orden" element={<ControlOrden />} />
+
                   <Route
                     path="/control-orden/mesa/:mesaId"
                     element={<MesaOrden />}
+                  />
+
+                  {/* IMPRESIÓN DE FACTURA */}
+                  <Route
+                    path="/imprimir-factura/:id"
+                    element={<ImprimirFacturaTicket />}
+                  />
+
+                  {/* IMPRESIÓN DE CUENTA PENDIENTE */}
+                  <Route
+                    path="/imprimir-cuenta-pendiente/:id"
+                    element={<ImprimirCuentaPendiente />}
                   />
                 </Routes>
               </main>

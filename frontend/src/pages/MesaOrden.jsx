@@ -958,15 +958,7 @@ function MesaOrden() {
                   <span className="fw-semibold">Total</span>
 
                   <span className="fs-4 fw-bold text-success">
-                    RD${" "}
-                    {formatearMoneda(
-                      detalle.reduce(
-                        (total, item) =>
-                          total +
-                          Number(item.cantidad || 0) * Number(item.precio || 0),
-                        0,
-                      ),
-                    )}
+                    RD$ {formatearMoneda(totalConPropina)}
                   </span>
                 </div>
 
@@ -998,22 +990,23 @@ function MesaOrden() {
                     <label className="form-check-label" htmlFor="propinaLey">
                       Aplicar propina de ley (10%)
                     </label>
-                    {itbisLeyHabilitado && (
-                      <div className="form-check mt-3">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id="itbisLey"
-                          checked={itbisAplicado}
-                          onChange={(e) => setItbisAplicado(e.target.checked)}
-                          disabled={cerrandoCuenta}
-                        />
+                  </div>
+                )}
 
-                        <label className="form-check-label" htmlFor="itbisLey">
-                          Aplicar ITBIS (18%)
-                        </label>
-                      </div>
-                    )}
+                {itbisLeyHabilitado && (
+                  <div className="form-check mt-3">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="itbisLey"
+                      checked={itbisAplicado}
+                      onChange={(e) => setItbisAplicado(e.target.checked)}
+                      disabled={cerrandoCuenta}
+                    />
+
+                    <label className="form-check-label" htmlFor="itbisLey">
+                      Aplicar ITBIS (18%)
+                    </label>
                   </div>
                 )}
                 <div className="mt-4 border-top pt-3">
@@ -1046,6 +1039,25 @@ function MesaOrden() {
               </div>
 
               <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const parametros = new URLSearchParams({
+                      propina: propinaAplicada ? "1" : "0",
+                      itbis: itbisAplicado ? "1" : "0",
+                      forma_pago: formaPago,
+                    });
+
+                    navigate(
+                      `/imprimir-cuenta-pendiente/${cuentaSeleccionada.id}?${parametros.toString()}`,
+                    );
+                  }}
+                  disabled={cerrandoCuenta || detalle.length === 0}
+                >
+                  🖨️ Imprimir cuenta
+                </button>
+
                 <button
                   type="button"
                   className="btn btn-secondary"

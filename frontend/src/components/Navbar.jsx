@@ -188,21 +188,21 @@ function Navbar() {
           </Link>
 
           {/* PRODUCTOS */}
+          {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+            <Link
+              to="/productos"
+              className={`sidebar-link ${
+                estaActivo("/productos") ? "sidebar-link-active" : ""
+              }`}
+              onClick={() => setSidebarAbierto(false)}
+            >
+              <span className="sidebar-icon">📦</span>
 
-          <Link
-            to="/productos"
-            className={`sidebar-link ${
-              estaActivo("/productos") ? "sidebar-link-active" : ""
-            }`}
-            onClick={() => setSidebarAbierto(false)}
-          >
-            <span className="sidebar-icon">📦</span>
-
-            <span>Productos</span>
-          </Link>
+              <span>Productos</span>
+            </Link>
+          )}
 
           {/* CLIENTES */}
-
           <Link
             to="/clientes"
             className={`sidebar-link ${
@@ -211,7 +211,6 @@ function Navbar() {
             onClick={() => setSidebarAbierto(false)}
           >
             <span className="sidebar-icon">👥</span>
-
             <span>Clientes</span>
           </Link>
 
@@ -294,34 +293,40 @@ function Navbar() {
               REPORTES
           ================================== */}
 
-          <button
-            type="button"
-            className={`sidebar-link sidebar-link-button ${
-              menuAbierto === "reportes" ? "sidebar-link-open" : ""
-            }`}
-            onClick={() => toggleMenu("reportes")}
-          >
-            <span className="sidebar-icon">📊</span>
-
-            <span className="sidebar-link-text">Reportes</span>
-
-            <span className="sidebar-arrow">
-              {menuAbierto === "reportes" ? "⌃" : "⌄"}
-            </span>
-          </button>
-
-          {menuAbierto === "reportes" && (
-            <div className="sidebar-submenu">
-              <Link
-                to="/reportes-caja"
-                className={`sidebar-sublink ${
-                  estaActivo("/reportes-caja") ? "sidebar-sublink-active" : ""
+          {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+            <>
+              <button
+                type="button"
+                className={`sidebar-link sidebar-link-button ${
+                  menuAbierto === "reportes" ? "sidebar-link-open" : ""
                 }`}
-                onClick={() => setSidebarAbierto(false)}
+                onClick={() => toggleMenu("reportes")}
               >
-                Reportes de caja
-              </Link>
-            </div>
+                <span className="sidebar-icon">📊</span>
+
+                <span className="sidebar-link-text">Reportes</span>
+
+                <span className="sidebar-arrow">
+                  {menuAbierto === "reportes" ? "⌃" : "⌄"}
+                </span>
+              </button>
+
+              {menuAbierto === "reportes" && (
+                <div className="sidebar-submenu">
+                  <Link
+                    to="/reportes-caja"
+                    className={`sidebar-sublink ${
+                      estaActivo("/reportes-caja")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Reportes de caja
+                  </Link>
+                </div>
+              )}
+            </>
           )}
 
           {/* ==================================

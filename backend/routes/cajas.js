@@ -77,6 +77,95 @@ router.get("/reportes", validarToken, async (req, res) => {
 });
 
 // =======================================
+// VENTAS DETALLADAS DE UN REPORTE DE CAJA
+// =======================================
+
+router.get("/reportes/:id/ventas", validarToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar que la caja pertenece al usuario y empresa
+    const cajaResult = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.fecha_apertura,
+        c.fecha_cierre,
+        c.estado,
+        e.nombre AS empresa,
+        u.nombre AS usuario_nombre
+      FROM cajas c
+      INNER JOIN empresas e
+        ON e.id = c.empresa_id
+      LEFT JOIN usuarios u
+        ON u.id = c.usuario_id
+        AND u.empresa_id = c.empresa_id
+      WHERE c.id = $1
+      AND c.usuario_id = $2
+      AND c.empresa_id = $3
+      `,
+      [id, req.usuario.id, req.usuario.empresa_id],
+    );
+
+    if (cajaResult.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Reporte de caja no encontrado.",
+      });
+    }
+
+    const ventasResult = await pool.query(
+      `
+      SELECT
+        f.id AS factura_id,
+        f.fecha,
+        f.total,
+        f.forma_pago,
+
+        CASE
+          WHEN fd.es_servicio = TRUE
+            THEN fd.descripcion_manual
+          ELSE p.nombre
+        END AS producto,
+
+        fd.cantidad,
+        fd.precio,
+        fd.descuento,
+
+        (
+          fd.cantidad * fd.precio
+        ) - COALESCE(fd.descuento, 0) AS subtotal
+
+      FROM facturas f
+
+      INNER JOIN factura_detalle fd
+        ON fd.factura_id = f.id
+
+      LEFT JOIN productos p
+        ON p.id = fd.producto_id
+        AND p.empresa_id = f.empresa_id
+
+      WHERE f.caja_id = $1
+      AND f.empresa_id = $2
+
+      ORDER BY f.id ASC, fd.id ASC
+      `,
+      [id, req.usuario.empresa_id],
+    );
+
+    res.json({
+      caja: cajaResult.rows[0],
+      ventas: ventasResult.rows,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      mensaje: "Error al obtener las ventas del reporte.",
+    });
+  }
+});
+
+// =======================================
 // DETALLE DE UN REPORTE DE CAJA
 // =======================================
 
