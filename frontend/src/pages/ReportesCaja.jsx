@@ -12,20 +12,22 @@ function ReportesCaja() {
 
   const [descargandoPDF, setDescargandoPDF] = useState(null);
 
-  useEffect(() => {
-    obtenerReportes();
-  }, []);
-
   // ==========================================
   // OBTENER REPORTES
   // ==========================================
 
+  useEffect(() => {
+    obtenerReportes();
+  }, []);
+
   const obtenerReportes = async () => {
     try {
       const res = await api.get("/cajas/reportes");
+
       setReportes(res.data);
     } catch (error) {
       console.error(error);
+
       alert("No fue posible obtener los reportes.");
     } finally {
       setCargando(false);
@@ -45,6 +47,7 @@ function ReportesCaja() {
       setReporteSeleccionado(res.data);
     } catch (error) {
       console.error(error);
+
       alert("No fue posible obtener el reporte.");
     } finally {
       setCargandoDetalle(false);
@@ -71,9 +74,16 @@ function ReportesCaja() {
     return reportes.reduce(
       (acc, item) => {
         acc.ventas += Number(item.total_ventas || 0);
+
         acc.ganancias += Number(item.ganancia || 0);
+
         acc.facturas += Number(item.cantidad_facturas || 0);
+
         acc.productos += Number(item.cantidad_productos || 0);
+
+        acc.propinas += Number(item.cantidad_propinas_aplicadas || 0);
+
+        acc.totalPropinas += Number(item.total_propinas || 0);
 
         return acc;
       },
@@ -82,6 +92,8 @@ function ReportesCaja() {
         ganancias: 0,
         facturas: 0,
         productos: 0,
+        propinas: 0,
+        totalPropinas: 0,
       },
     );
   }, [reportes]);
@@ -97,6 +109,11 @@ function ReportesCaja() {
       const response = await api.get(`/cajas/reportes/${cajaId}/ventas`);
 
       const { caja, ventas } = response.data;
+
+      // Buscar información adicional del reporte
+      const reporteCaja = reportes.find(
+        (r) => Number(r.id) === Number(caja.id),
+      );
 
       // ========================================
       // CREAR DOCUMENTO
@@ -121,16 +138,22 @@ function ReportesCaja() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
 
-      doc.text("REPORTE DE CAJA", anchoPagina / 2, y, { align: "center" });
+      doc.text("REPORTE DE CAJA", anchoPagina / 2, y, {
+        align: "center",
+      });
 
       y += 9;
 
       doc.setFontSize(12);
-      doc.text(`Caja #${caja.id}`, anchoPagina / 2, y, { align: "center" });
+
+      doc.text(`Caja #${caja.id}`, anchoPagina / 2, y, {
+        align: "center",
+      });
 
       y += 10;
 
       doc.setDrawColor(180, 180, 180);
+
       doc.line(margen, y, anchoPagina - margen, y);
 
       y += 8;
@@ -186,6 +209,7 @@ function ReportesCaja() {
       y += 7;
 
       doc.setDrawColor(180, 180, 180);
+
       doc.line(margen, y, anchoPagina - margen, y);
 
       y += 7;
@@ -234,6 +258,7 @@ function ReportesCaja() {
         // Revisar espacio antes de imprimir
         if (y + lineasTexto.length * 5 + 15 > 280) {
           doc.addPage();
+
           y = 18;
         }
 
@@ -246,6 +271,7 @@ function ReportesCaja() {
         y += lineasTexto.length * 5;
 
         doc.setFontSize(8);
+
         doc.setTextColor(100, 100, 100);
 
         doc.text(
@@ -257,6 +283,7 @@ function ReportesCaja() {
         );
 
         doc.setFontSize(10);
+
         doc.setTextColor(0, 0, 0);
 
         y += 7;
@@ -266,14 +293,16 @@ function ReportesCaja() {
       // RESUMEN FINAL
       // ========================================
 
-      if (y + 70 > 280) {
+      if (y + 90 > 280) {
         doc.addPage();
+
         y = 18;
       }
 
       y += 2;
 
       doc.setDrawColor(180, 180, 180);
+
       doc.line(margen, y, anchoPagina - margen, y);
 
       y += 9;
@@ -284,6 +313,7 @@ function ReportesCaja() {
       );
 
       doc.setFont("helvetica", "bold");
+
       doc.setFontSize(12);
 
       doc.text("RESUMEN", margen, y);
@@ -291,41 +321,64 @@ function ReportesCaja() {
       y += 8;
 
       doc.setFont("helvetica", "normal");
+
       doc.setFontSize(10);
+
+      // Total ventas
 
       doc.text(`Total ventas: ${dinero(totalVentas)}`, margen, y);
 
       y += 6;
 
-      doc.text(
-        `Efectivo: ${dinero(reportes.find((r) => r.id === caja.id)?.efectivo)}`,
-        margen,
-        y,
-      );
+      // Efectivo
+
+      doc.text(`Efectivo: ${dinero(reporteCaja?.efectivo)}`, margen, y);
 
       y += 6;
 
-      doc.text(
-        `Tarjeta: ${dinero(reportes.find((r) => r.id === caja.id)?.tarjeta)}`,
-        margen,
-        y,
-      );
+      // Tarjeta
+
+      doc.text(`Tarjeta: ${dinero(reporteCaja?.tarjeta)}`, margen, y);
 
       y += 6;
 
+      // Transferencia
+
       doc.text(
-        `Transferencia: ${dinero(
-          reportes.find((r) => r.id === caja.id)?.transferencia,
-        )}`,
+        `Transferencia: ${dinero(reporteCaja?.transferencia)}`,
         margen,
         y,
       );
 
       y += 9;
 
+      // Facturas
+
       doc.text(`Facturas: ${listaVentas.length}`, margen, y);
 
       y += 6;
+
+      // Propinas aplicadas
+
+      doc.text(
+        `Propinas aplicadas: ${reporteCaja?.cantidad_propinas_aplicadas || 0}`,
+        margen,
+        y,
+      );
+
+      y += 6;
+
+      // Total propinas
+
+      doc.text(
+        `Total propinas: ${dinero(reporteCaja?.total_propinas)}`,
+        margen,
+        y,
+      );
+
+      y += 6;
+
+      // Productos vendidos
 
       const cantidadProductos = ventas.reduce(
         (total, item) => total + Number(item.cantidad || 0),
@@ -341,11 +394,13 @@ function ReportesCaja() {
       y += 14;
 
       doc.setDrawColor(180, 180, 180);
+
       doc.line(margen, y, anchoPagina - margen, y);
 
       y += 7;
 
       doc.setFontSize(8);
+
       doc.setTextColor(100, 100, 100);
 
       doc.text("Sistema de Facturación", anchoPagina / 2, y, {
@@ -366,6 +421,10 @@ function ReportesCaja() {
     }
   };
 
+  // ==========================================
+  // RENDER
+  // ==========================================
+
   return (
     <>
       <Navbar />
@@ -377,38 +436,64 @@ function ReportesCaja() {
             TARJETAS DE RESUMEN
         ========================================== */}
 
-        <div className="row mb-4">
-          <div className="col-md-3">
-            <div className="card text-bg-success">
+        <div className="row row-cols-1 row-cols-md-5 g-3 mb-4">
+          {/* TOTAL VENDIDO */}
+
+          <div className="col">
+            <div className="card text-bg-success h-100">
               <div className="card-body">
                 <h6>Total vendido</h6>
+
                 <h3>{dinero(resumen.ventas)}</h3>
               </div>
             </div>
           </div>
 
-          <div className="col-md-3">
-            <div className="card text-bg-primary">
+          {/* GANANCIAS */}
+
+          <div className="col">
+            <div className="card text-bg-primary h-100">
               <div className="card-body">
                 <h6>Ganancias</h6>
+
                 <h3>{dinero(resumen.ganancias)}</h3>
               </div>
             </div>
           </div>
 
-          <div className="col-md-3">
-            <div className="card text-bg-warning">
+          {/* FACTURAS */}
+
+          <div className="col">
+            <div className="card text-bg-warning h-100">
               <div className="card-body">
                 <h6>Facturas</h6>
+
                 <h3>{resumen.facturas}</h3>
               </div>
             </div>
           </div>
 
-          <div className="col-md-3">
-            <div className="card text-bg-info">
+          {/* PROPINAS */}
+
+          <div className="col">
+            <div className="card text-bg-info h-100">
+              <div className="card-body">
+                <h6>Propinas aplicadas</h6>
+
+                <h3>{resumen.propinas}</h3>
+
+                <small>{dinero(resumen.totalPropinas)}</small>
+              </div>
+            </div>
+          </div>
+
+          {/* PRODUCTOS */}
+
+          <div className="col">
+            <div className="card bg-dark text-white h-100">
               <div className="card-body">
                 <h6>Productos</h6>
+
                 <h3>{resumen.productos}</h3>
               </div>
             </div>
@@ -427,7 +512,7 @@ function ReportesCaja() {
               <p>Cargando...</p>
             ) : (
               <div className="table-responsive">
-                <table className="table table-hover">
+                <table className="table table-hover align-middle">
                   <thead>
                     <tr>
                       <th>#</th>
@@ -436,60 +521,79 @@ function ReportesCaja() {
                       <th>Ventas</th>
                       <th>Ganancia</th>
                       <th>Facturas</th>
+                      <th>Propinas</th>
                       <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {reportes.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.id}</td>
+                    {reportes.length > 0 ? (
+                      reportes.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.id}</td>
 
-                        <td>{new Date(r.fecha_apertura).toLocaleString()}</td>
+                          <td>{new Date(r.fecha_apertura).toLocaleString()}</td>
 
-                        <td>
-                          {r.fecha_cierre
-                            ? new Date(r.fecha_cierre).toLocaleString()
-                            : "-"}
-                        </td>
+                          <td>
+                            {r.fecha_cierre
+                              ? new Date(r.fecha_cierre).toLocaleString()
+                              : "-"}
+                          </td>
 
-                        <td>{dinero(r.total_ventas)}</td>
+                          <td>{dinero(r.total_ventas)}</td>
 
-                        <td>{dinero(r.ganancia)}</td>
+                          <td>{dinero(r.ganancia)}</td>
 
-                        <td>{r.cantidad_facturas}</td>
+                          <td>{r.cantidad_facturas}</td>
 
-                        <td>{r.estado}</td>
+                          <td>
+                            <div className="fw-semibold">
+                              {r.cantidad_propinas_aplicadas || 0}
+                            </div>
 
-                        <td>
-                          <div className="d-flex gap-2">
-                            {/* VER */}
+                            <small className="text-muted">
+                              {dinero(r.total_propinas)}
+                            </small>
+                          </td>
 
-                            <button
-                              className="btn btn-outline-primary btn-sm"
-                              data-bs-toggle="modal"
-                              data-bs-target="#modalReporte"
-                              onClick={() => verReporte(r.id)}
-                            >
-                              Ver
-                            </button>
+                          <td>{r.estado}</td>
 
-                            {/* PDF */}
+                          <td>
+                            <div className="d-flex gap-2 flex-wrap">
+                              {/* VER */}
 
-                            <button
-                              className="btn btn-outline-success btn-sm"
-                              onClick={() => descargarPDF(r.id)}
-                              disabled={descargandoPDF === r.id}
-                            >
-                              {descargandoPDF === r.id
-                                ? "Generando..."
-                                : "⬇ Descargar PDF"}
-                            </button>
-                          </div>
+                              <button
+                                className="btn btn-outline-primary btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalReporte"
+                                onClick={() => verReporte(r.id)}
+                              >
+                                Ver
+                              </button>
+
+                              {/* PDF */}
+
+                              <button
+                                className="btn btn-outline-success btn-sm"
+                                onClick={() => descargarPDF(r.id)}
+                                disabled={descargandoPDF === r.id}
+                              >
+                                {descargandoPDF === r.id
+                                  ? "Generando..."
+                                  : "⬇ Descargar PDF"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="9" className="text-center py-5 text-muted">
+                          No hay reportes de caja registrados.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -523,8 +627,10 @@ function ReportesCaja() {
               ) : (
                 reporteSeleccionado && (
                   <div className="row">
+                    {/* INFORMACIÓN DE CAJA */}
+
                     <div className="col-md-6 mb-3">
-                      <div className="card">
+                      <div className="card h-100">
                         <div className="card-body">
                           <h5>Caja #{reporteSeleccionado.id}</h5>
 
@@ -535,6 +641,7 @@ function ReportesCaja() {
 
                           <p>
                             <strong>Apertura:</strong>
+
                             <br />
 
                             {new Date(
@@ -544,20 +651,30 @@ function ReportesCaja() {
 
                           <p>
                             <strong>Cierre:</strong>
+
                             <br />
 
                             {reporteSeleccionado.fecha_cierre
                               ? new Date(
                                   reporteSeleccionado.fecha_cierre,
-                                ).toLocaleString()
+                                ).toLocaleString("es-DO", {
+                                  timeZone: "America/Santo_Domingo",
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
                               : "-"}
                           </p>
                         </div>
                       </div>
                     </div>
 
+                    {/* RESUMEN */}
+
                     <div className="col-md-6 mb-3">
-                      <div className="card">
+                      <div className="card h-100">
                         <div className="card-body">
                           <h5>Resumen</h5>
 
@@ -582,12 +699,25 @@ function ReportesCaja() {
                           </p>
 
                           <p>
+                            <strong>Propinas aplicadas:</strong>{" "}
+                            {reporteSeleccionado.cantidad_propinas_aplicadas ||
+                              0}
+                          </p>
+
+                          <p>
+                            <strong>Total propinas:</strong>{" "}
+                            {dinero(reporteSeleccionado.total_propinas)}
+                          </p>
+
+                          <p>
                             <strong>Productos:</strong>{" "}
                             {reporteSeleccionado.cantidad_productos}
                           </p>
                         </div>
                       </div>
                     </div>
+
+                    {/* EFECTIVO */}
 
                     <div className="col-md-4">
                       <div className="card">
@@ -599,6 +729,8 @@ function ReportesCaja() {
                       </div>
                     </div>
 
+                    {/* TARJETA */}
+
                     <div className="col-md-4">
                       <div className="card">
                         <div className="card-body">
@@ -608,6 +740,8 @@ function ReportesCaja() {
                         </div>
                       </div>
                     </div>
+
+                    {/* TRANSFERENCIA */}
 
                     <div className="col-md-4">
                       <div className="card">
@@ -619,6 +753,8 @@ function ReportesCaja() {
                       </div>
                     </div>
 
+                    {/* DINERO CONTADO */}
+
                     <div className="col-md-6 mt-3">
                       <div className="card border-success">
                         <div className="card-body">
@@ -628,6 +764,8 @@ function ReportesCaja() {
                         </div>
                       </div>
                     </div>
+
+                    {/* DIFERENCIA */}
 
                     <div className="col-md-6 mt-3">
                       <div className="card border-danger">

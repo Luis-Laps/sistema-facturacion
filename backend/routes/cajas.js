@@ -43,25 +43,50 @@ router.get("/reportes", validarToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        id,
-        fecha_apertura,
-        fecha_cierre,
-        monto_inicial,
-        efectivo,
-        tarjeta,
-        transferencia,
-        dinero_contado,
-        diferencia,
-        total_ventas,
-        total_costos,
-        ganancia,
-        cantidad_facturas,
-        cantidad_productos,
-        estado
-      FROM cajas
-      WHERE usuario_id = $1
-      AND empresa_id = $2
-      ORDER BY fecha_apertura DESC
+        c.id,
+        c.fecha_apertura,
+        c.fecha_cierre,
+        c.monto_inicial,
+        c.efectivo,
+        c.tarjeta,
+        c.transferencia,
+        c.dinero_contado,
+        c.diferencia,
+        c.total_ventas,
+        c.total_costos,
+        c.ganancia,
+        c.cantidad_facturas,
+        c.cantidad_productos,
+        c.estado,
+
+        COALESCE(
+          (
+            SELECT COUNT(*)
+            FROM facturas f
+            WHERE f.caja_id = c.id
+            AND f.empresa_id = c.empresa_id
+            AND f.propina_aplicada = TRUE
+          ),
+          0
+        ) AS cantidad_propinas_aplicadas,
+
+        COALESCE(
+          (
+            SELECT SUM(COALESCE(f.propina, 0))
+            FROM facturas f
+            WHERE f.caja_id = c.id
+            AND f.empresa_id = c.empresa_id
+            AND f.propina_aplicada = TRUE
+          ),
+          0
+        ) AS total_propinas
+
+      FROM cajas c
+
+      WHERE c.usuario_id = $1
+      AND c.empresa_id = $2
+
+      ORDER BY c.fecha_apertura DESC
       `,
       [req.usuario.id, req.usuario.empresa_id],
     );
@@ -120,6 +145,8 @@ router.get("/reportes/:id/ventas", validarToken, async (req, res) => {
         f.fecha,
         f.total,
         f.forma_pago,
+        f.propina_aplicada,
+        f.propina,
 
         CASE
           WHEN fd.es_servicio = TRUE
@@ -176,25 +203,49 @@ router.get("/reportes/:id", validarToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        id,
-        fecha_apertura,
-        fecha_cierre,
-        monto_inicial,
-        efectivo,
-        tarjeta,
-        transferencia,
-        dinero_contado,
-        diferencia,
-        total_ventas,
-        total_costos,
-        ganancia,
-        cantidad_facturas,
-        cantidad_productos,
-        estado
-      FROM cajas
-      WHERE id = $1
-      AND usuario_id = $2
-      AND empresa_id = $3
+        c.id,
+        c.fecha_apertura,
+        c.fecha_cierre,
+        c.monto_inicial,
+        c.efectivo,
+        c.tarjeta,
+        c.transferencia,
+        c.dinero_contado,
+        c.diferencia,
+        c.total_ventas,
+        c.total_costos,
+        c.ganancia,
+        c.cantidad_facturas,
+        c.cantidad_productos,
+        c.estado,
+
+        COALESCE(
+          (
+            SELECT COUNT(*)
+            FROM facturas f
+            WHERE f.caja_id = c.id
+            AND f.empresa_id = c.empresa_id
+            AND f.propina_aplicada = TRUE
+          ),
+          0
+        ) AS cantidad_propinas_aplicadas,
+
+        COALESCE(
+          (
+            SELECT SUM(COALESCE(f.propina, 0))
+            FROM facturas f
+            WHERE f.caja_id = c.id
+            AND f.empresa_id = c.empresa_id
+            AND f.propina_aplicada = TRUE
+          ),
+          0
+        ) AS total_propinas
+
+      FROM cajas c
+
+      WHERE c.id = $1
+      AND c.usuario_id = $2
+      AND c.empresa_id = $3
       `,
       [id, req.usuario.id, req.usuario.empresa_id],
     );
@@ -304,15 +355,37 @@ router.post("/cerrar", validarToken, async (req, res) => {
     const cajaActual = caja.rows[0];
 
     // ===========================================
-    // TOTAL VENTAS Y FACTURAS
+    // TOTAL VENTAS, FACTURAS Y PROPINAS
     // ===========================================
 
     const ventasResult = await pool.query(
       `
       SELECT
+
         COUNT(*) AS cantidad_facturas,
-        COALESCE(SUM(total), 0) AS total_ventas
+
+        COUNT(*) FILTER (
+          WHERE propina_aplicada = TRUE
+        ) AS cantidad_propinas_aplicadas,
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN propina_aplicada = TRUE
+              THEN COALESCE(propina, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS total_propinas,
+
+        COALESCE(
+          SUM(total),
+          0
+        ) AS total_ventas
+
       FROM facturas
+
       WHERE caja_id = $1
       AND empresa_id = $2
       `,
@@ -323,6 +396,12 @@ router.post("/cerrar", validarToken, async (req, res) => {
 
     const cantidadFacturas = Number(ventasResult.rows[0].cantidad_facturas);
 
+    const cantidadPropinasAplicadas = Number(
+      ventasResult.rows[0].cantidad_propinas_aplicadas,
+    );
+
+    const totalPropinas = Number(ventasResult.rows[0].total_propinas);
+
     // ===========================================
     // PRODUCTOS VENDIDOS Y COSTOS
     // ===========================================
@@ -330,7 +409,11 @@ router.post("/cerrar", validarToken, async (req, res) => {
     const detalleResult = await pool.query(
       `
       SELECT
-        COALESCE(SUM(fd.cantidad), 0) AS cantidad_productos,
+
+        COALESCE(
+          SUM(fd.cantidad),
+          0
+        ) AS cantidad_productos,
 
         COALESCE(
           SUM(
@@ -381,7 +464,7 @@ router.post("/cerrar", validarToken, async (req, res) => {
       SET
         dinero_contado = $1,
         diferencia = $2,
-        fecha_cierre = NOW(),
+        fecha_cierre = CURRENT_TIMESTAMP AT TIME ZONE 'America/Santo_Domingo',
         estado = 'CERRADA',
         total_ventas = $3,
         total_costos = $4,
@@ -415,6 +498,8 @@ router.post("/cerrar", validarToken, async (req, res) => {
       totalCostos,
       ganancia,
       cantidadFacturas,
+      cantidadPropinasAplicadas,
+      totalPropinas,
       cantidadProductos,
     });
   } catch (error) {

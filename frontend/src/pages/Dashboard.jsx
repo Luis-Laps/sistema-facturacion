@@ -39,6 +39,16 @@ function Dashboard() {
     facturas: 0,
     ventas: 0,
     ganancias: 0,
+
+    // Control de Orden
+    manejoMesas: false,
+
+    // Propinas
+    propinas: {
+      cantidad: 0,
+      total: 0,
+    },
+
     ultimasFacturas: [],
   });
 
@@ -71,10 +81,23 @@ function Dashboard() {
 
       setDatos({
         productos: response.data.productos ?? 0,
+
         clientes: response.data.clientes ?? 0,
+
         facturas: response.data.facturas ?? 0,
+
         ventas: response.data.ventas ?? 0,
+
         ganancias: response.data.ganancias ?? 0,
+
+        manejoMesas: response.data.manejoMesas === true,
+
+        propinas: {
+          cantidad: Number(response.data.propinas?.cantidad || 0),
+
+          total: Number(response.data.propinas?.total || 0),
+        },
+
         ultimasFacturas: response.data.ultimasFacturas ?? [],
       });
     } catch (error) {
@@ -111,8 +134,6 @@ function Dashboard() {
   // ==========================================
 
   const aplicarFiltro = (tipo) => {
-    const fechaActual = new Date();
-
     let nuevaDesde = hoy;
     let nuevaHasta = hoy;
 
@@ -136,7 +157,9 @@ function Dashboard() {
     }
 
     setFiltroActivo(tipo);
+
     setDesde(nuevaDesde);
+
     setHasta(nuevaHasta);
   };
 
@@ -205,10 +228,16 @@ function Dashboard() {
       Number(cajaAbierta.monto_inicial || 0) +
       Number(cajaAbierta.efectivo || 0);
 
+    // ==========================================
+    // MODAL DE CIERRE
+    // ==========================================
+
     const { value, isConfirmed } = await Swal.fire({
       title: "Cerrar Caja",
+
       html: `
         <div style="text-align:left">
+
           <div class="mb-2">
             <strong>Monto inicial:</strong>
             RD$ ${moneda(cajaAbierta.monto_inicial)}
@@ -228,19 +257,29 @@ function Dashboard() {
           <h3 style="color:#198754">
             RD$ ${moneda(debeHaber)}
           </h3>
+
         </div>
       `,
+
       input: "number",
+
       inputLabel: "Dinero contado",
+
       inputPlaceholder: "0.00",
+
       inputAttributes: {
         min: 0,
         step: "0.01",
       },
+
       showCancelButton: true,
+
       confirmButtonText: "Cerrar Caja",
+
       cancelButtonText: "Cancelar",
+
       confirmButtonColor: "#dc3545",
+
       inputValidator: (value) => {
         if (value === "") {
           return "Debe indicar el dinero contado.";
@@ -261,22 +300,60 @@ function Dashboard() {
 
       await verificarCaja();
 
+      // ==========================================
+      // RESULTADO DEL CIERRE
+      // ==========================================
+
       Swal.fire({
         icon: "success",
         title: "Caja cerrada",
-        html: `
-          <p>
-            <strong>Debe haber:</strong>
-            RD$ ${moneda(response.data.debeHaber)}
-          </p>
 
-          <p>
-            <strong>Diferencia:</strong>
-            RD$ ${moneda(response.data.diferencia)}
-          </p>
+        html: `
+          <div style="text-align:left">
+
+            <p>
+              <strong>Debe haber:</strong>
+              RD$ ${moneda(response.data.debeHaber)}
+            </p>
+
+            <p>
+              <strong>Diferencia:</strong>
+              RD$ ${moneda(response.data.diferencia)}
+            </p>
+
+            <hr>
+
+            <p>
+              <strong>Facturas:</strong>
+              ${response.data.cantidadFacturas || 0}
+            </p>
+
+            <p>
+              <strong>Propinas aplicadas:</strong>
+              ${response.data.cantidadPropinasAplicadas || 0}
+            </p>
+
+            <p>
+              <strong>Total propinas:</strong>
+              RD$ ${moneda(response.data.totalPropinas)}
+            </p>
+
+            <p>
+              <strong>Productos vendidos:</strong>
+              ${response.data.cantidadProductos || 0}
+            </p>
+
+            <p>
+              <strong>Total vendido:</strong>
+              RD$ ${moneda(response.data.totalVentas)}
+            </p>
+
+          </div>
         `,
       });
     } catch (error) {
+      console.error("Error cerrando caja:", error);
+
       Swal.fire(
         "Error",
         error.response?.data?.mensaje || "No fue posible cerrar la caja.",
@@ -286,7 +363,7 @@ function Dashboard() {
   };
 
   // ==========================================
-  // EFECTO INICIAL / FILTROS
+  // EFECTOS
   // ==========================================
 
   useEffect(() => {
@@ -396,6 +473,7 @@ function Dashboard() {
                     value={desde}
                     onChange={(e) => {
                       setFiltroActivo("personalizado");
+
                       setDesde(e.target.value);
                     }}
                   />
@@ -412,6 +490,7 @@ function Dashboard() {
                     value={hasta}
                     onChange={(e) => {
                       setFiltroActivo("personalizado");
+
                       setHasta(e.target.value);
                     }}
                   />
@@ -591,6 +670,51 @@ function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* ======================================
+              PROPINAS
+              SOLO CONTROL DE ORDEN
+          ====================================== */}
+
+          {datos.manejoMesas && (
+            <div className="col-12 col-sm-6 col-xl">
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <div className="text-muted small mb-2">Propinas</div>
+
+                      <div className="fs-3 fw-bold text-primary">
+                        {cargando
+                          ? "..."
+                          : `RD$ ${moneda(datos.propinas.total)}`}
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center"
+                      style={{
+                        width: "46px",
+                        height: "46px",
+                        background: "#e8f1ff",
+                        fontSize: "21px",
+                      }}
+                    >
+                      💙
+                    </div>
+                  </div>
+
+                  <div className="small text-muted mt-3">
+                    {datos.propinas.cantidad}{" "}
+                    {datos.propinas.cantidad === 1
+                      ? "propina aplicada"
+                      : "propinas aplicadas"}{" "}
+                    en el período
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ======================================
@@ -637,6 +761,7 @@ function Dashboard() {
                         {new Date(
                           cajaAbierta.fecha_apertura,
                         ).toLocaleTimeString("es-DO", {
+                          timeZone: "America/Santo_Domingo",
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -735,8 +860,11 @@ function Dashboard() {
                 <thead className="table-light">
                   <tr>
                     <th className="px-4">Factura</th>
+
                     <th>Cliente</th>
+
                     <th>Fecha</th>
+
                     <th className="text-end px-4">Total</th>
                   </tr>
                 </thead>
