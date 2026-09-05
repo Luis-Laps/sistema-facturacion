@@ -31,6 +31,10 @@ function MesaOrden() {
   const [itbisLeyHabilitado, setItbisLeyHabilitado] = useState(false);
   const [itbisAplicado, setItbisAplicado] = useState(false);
 
+  // Descuento general de la orden
+  // Solo se permite uno de estos porcentajes: 5%, 10% o 20%.
+  const [descuentoAplicado, setDescuentoAplicado] = useState(0);
+
   // ==========================================
   // CUENTA SELECCIONADA
   // ==========================================
@@ -285,6 +289,7 @@ function MesaOrden() {
     setFormaPago("EFECTIVO");
     setPropinaAplicada(false);
     setItbisAplicado(false);
+    setDescuentoAplicado(0);
     setMostrarCerrar(true);
   };
 
@@ -306,6 +311,7 @@ function MesaOrden() {
           forma_pago: formaPago,
           propina_aplicada: propinaAplicada,
           itbis_aplicado: itbisAplicado,
+          descuento_porcentaje: descuentoAplicado,
         },
       );
 
@@ -432,17 +438,38 @@ function MesaOrden() {
   };
   const subtotalCuenta = detalle.reduce(
     (total, item) =>
-      total + Number(item.cantidad || 0) * Number(item.precio || 0),
+      total +
+      Number(item.cantidad || 0) * Number(item.precio || 0) -
+      Number(item.descuento || 0),
     0,
   );
 
-  const montoPropina = propinaAplicada ? subtotalCuenta * 0.1 : 0;
+  const montoDescuento =
+    descuentoAplicado > 0
+      ? Math.round(
+          (subtotalCuenta * (Number(descuentoAplicado) / 100) +
+            Number.EPSILON) *
+            100,
+        ) / 100
+      : 0;
 
-  const montoItbis = itbisAplicado
-    ? Math.round(subtotalCuenta * 0.18 * 100) / 100
+  const subtotalConDescuento = Math.max(
+    0,
+    Math.round((subtotalCuenta - montoDescuento + Number.EPSILON) * 100) / 100,
+  );
+
+  const montoPropina = propinaAplicada
+    ? Math.round((subtotalConDescuento * 0.1 + Number.EPSILON) * 100) / 100
     : 0;
 
-  const totalConPropina = subtotalCuenta + montoPropina + montoItbis;
+  const montoItbis = itbisAplicado
+    ? Math.round((subtotalConDescuento * 0.18 + Number.EPSILON) * 100) / 100
+    : 0;
+
+  const totalConPropina =
+    Math.round(
+      (subtotalConDescuento + montoPropina + montoItbis + Number.EPSILON) * 100,
+    ) / 100;
 
   if (cargando) {
     return (
@@ -976,6 +1003,38 @@ function MesaOrden() {
 
                   <option value="TRANSFERENCIA">Transferencia</option>
                 </select>
+
+                <div className="mt-4">
+                  <label className="form-label fw-semibold d-block">
+                    Descuento
+                  </label>
+
+                  <div className="d-flex flex-column gap-2">
+                    {[0, 5, 10, 20].map((porcentaje) => (
+                      <div className="form-check" key={porcentaje}>
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="descuentoOrden"
+                          id={`descuentoOrden${porcentaje}`}
+                          checked={descuentoAplicado === porcentaje}
+                          onChange={() => setDescuentoAplicado(porcentaje)}
+                          disabled={cerrandoCuenta}
+                        />
+
+                        <label
+                          className="form-check-label"
+                          htmlFor={`descuentoOrden${porcentaje}`}
+                        >
+                          {porcentaje === 0
+                            ? "Sin descuento"
+                            : `${porcentaje}%`}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {propinaLeyHabilitada && (
                   <div className="form-check mt-3">
                     <input
@@ -1015,6 +1074,18 @@ function MesaOrden() {
                     <strong>RD$ {formatearMoneda(subtotalCuenta)}</strong>
                   </div>
 
+                  {montoDescuento > 0 && (
+                    <div className="d-flex justify-content-between mb-2 text-danger">
+                      <span>Descuento ({descuentoAplicado}%)</span>
+                      <strong>-RD$ {formatearMoneda(montoDescuento)}</strong>
+                    </div>
+                  )}
+
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Subtotal con descuento</span>
+                    <strong>RD$ {formatearMoneda(subtotalConDescuento)}</strong>
+                  </div>
+
                   {propinaAplicada && (
                     <div className="d-flex justify-content-between mb-2">
                       <span>Propina de ley (10%)</span>
@@ -1047,6 +1118,7 @@ function MesaOrden() {
                       propina: propinaAplicada ? "1" : "0",
                       itbis: itbisAplicado ? "1" : "0",
                       forma_pago: formaPago,
+                      descuento: String(descuentoAplicado),
                     });
 
                     navigate(

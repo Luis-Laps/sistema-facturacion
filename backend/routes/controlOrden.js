@@ -74,76 +74,6 @@ router.get("/mesas", validarToken, async (req, res) => {
 });
 
 // ==========================================
-// ELIMINAR MESA
-// ==========================================
-
-router.delete("/mesas/:mesaId", validarToken, async (req, res) => {
-  try {
-    const { mesaId } = req.params;
-
-    // Verificar que la mesa pertenezca a la empresa
-    const mesaResult = await pool.query(
-      `
-      SELECT id, nombre
-      FROM mesas
-      WHERE
-        id = $1
-        AND empresa_id = $2
-        AND activa = TRUE
-      `,
-      [mesaId, req.usuario.empresa_id],
-    );
-
-    if (mesaResult.rows.length === 0) {
-      return res.status(404).json({
-        mensaje: "Mesa no encontrada.",
-      });
-    }
-
-    // Una mesa ocupada NO se puede eliminar
-    const cuentaResult = await pool.query(
-      `
-      SELECT id
-      FROM cuentas
-      WHERE
-        mesa_id = $1
-        AND estado = 'ABIERTA'
-      LIMIT 1
-      `,
-      [mesaId],
-    );
-
-    if (cuentaResult.rows.length > 0) {
-      return res.status(400).json({
-        mensaje: "No puedes eliminar una mesa que está ocupada.",
-      });
-    }
-
-    // Desactivar mesa para conservar su historial
-    await pool.query(
-      `
-      UPDATE mesas
-      SET activa = FALSE
-      WHERE
-        id = $1
-        AND empresa_id = $2
-      `,
-      [mesaId, req.usuario.empresa_id],
-    );
-
-    res.json({
-      mensaje: `Mesa "${mesaResult.rows[0].nombre}" eliminada correctamente.`,
-    });
-  } catch (error) {
-    console.error("Error al eliminar mesa:", error);
-
-    res.status(500).json({
-      mensaje: "Error al eliminar la mesa.",
-    });
-  }
-});
-
-// ==========================================
 // CREAR MESA
 // ==========================================
 
@@ -716,6 +646,7 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
       propina_aplicada = false,
       itbis_aplicado = false,
       cliente_id = null,
+      descuento_porcentaje = 0,
     } = req.body;
 
     // ==========================================
@@ -726,6 +657,23 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
 
     if (!formasPermitidas.includes(forma_pago)) {
       throw new Error("Forma de pago inválida.");
+    }
+
+    // ==========================================
+    // DESCUENTO GENERAL DE LA CUENTA
+    // ==========================================
+
+    const descuentoPorcentaje = Number(descuento_porcentaje);
+
+    const descuentosPermitidos = [0, 5, 10, 20];
+
+    if (
+      !Number.isFinite(descuentoPorcentaje) ||
+      !descuentosPermitidos.includes(descuentoPorcentaje)
+    ) {
+      throw new Error(
+        "Descuento inválido. Solo se permiten 0%, 5%, 10% y 20%.",
+      );
     }
 
     // ==========================================
@@ -849,6 +797,19 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     totalCostos = Math.round((totalCostos + Number.EPSILON) * 100) / 100;
 
     // ==========================================
+    // DESCUENTO GENERAL
+    // ==========================================
+
+    const descuento =
+      Math.round(
+        (subtotal * (descuentoPorcentaje / 100) + Number.EPSILON) * 100,
+      ) / 100;
+
+    const subtotalConDescuento =
+      Math.round((Math.max(0, subtotal - descuento) + Number.EPSILON) * 100) /
+      100;
+
+    // ==========================================
     // CONFIGURACIÓN EMPRESA
     // ==========================================
 
@@ -859,8 +820,8 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
           propina_ley,
           itbis_ley
         FROM empresas
-          WHERE id = $1
-          `,
+        WHERE id = $1
+        `,
       [req.usuario.empresa_id],
     );
 
@@ -889,7 +850,8 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     let propina = 0;
 
     if (aplicarPropina) {
-      propina = Math.round((subtotal * 0.1 + Number.EPSILON) * 100) / 100;
+      propina =
+        Math.round((subtotalConDescuento * 0.1 + Number.EPSILON) * 100) / 100;
     }
 
     // ==========================================
@@ -909,14 +871,19 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     let itbis = 0;
 
     if (aplicarItbis) {
-      itbis = Math.round((subtotal * 0.18 + Number.EPSILON) * 100) / 100;
+      itbis =
+        Math.round((subtotalConDescuento * 0.18 + Number.EPSILON) * 100) / 100;
     }
+
     // ==========================================
     // TOTAL
     // ==========================================
 
     const total =
-      Math.round((subtotal + propina + itbis + Number.EPSILON) * 100) / 100;
+      Math.round(
+        (subtotalConDescuento + propina + itbis + Number.EPSILON) * 100,
+      ) / 100;
+
     // ==========================================
     // BUSCAR CAJA ABIERTA
     // ==========================================
@@ -947,27 +914,46 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
     // CLIENTE
     // ==========================================
 
-    // ==========================================
-    // CLIENTE
-    // ==========================================
-
-    let clienteId = cliente_id || null;
+    let clienteId = cliente_id;
 
     if (clienteId) {
       const clienteResult = await client.query(
         `
-      SELECT id
-      FROM clientes
-      WHERE
-        id = $1
-        AND empresa_id = $2
-      `,
+            SELECT id
+            FROM clientes
+            WHERE
+              id = $1
+              AND empresa_id = $2
+            `,
         [clienteId, req.usuario.empresa_id],
       );
 
       if (clienteResult.rows.length === 0) {
         throw new Error("El cliente seleccionado no pertenece a esta empresa.");
       }
+    } else {
+      // Si no se seleccionó cliente,
+      // utilizamos el primer cliente
+      // disponible de la empresa.
+
+      const clienteResult = await client.query(
+        `
+            SELECT id
+            FROM clientes
+            WHERE empresa_id = $1
+            ORDER BY id ASC
+            LIMIT 1
+            `,
+        [req.usuario.empresa_id],
+      );
+
+      if (clienteResult.rows.length === 0) {
+        throw new Error(
+          "No existe ningún cliente registrado para esta empresa.",
+        );
+      }
+
+      clienteId = clienteResult.rows[0].id;
     }
 
     // ==========================================
@@ -987,10 +973,12 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
       propina_aplicada,
       propina,
       itbis_aplicado,
-      itbis
+      itbis,
+      descuento_tipo,
+      descuento
     )
     VALUES (
-      NOW(),
+      CURRENT_TIMESTAMP AT TIME ZONE 'America/Santo_Domingo',
       $1,
       $2,
       $3,
@@ -1000,7 +988,9 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
       $7,
       $8,
       $9,
-      $10
+      $10,
+      $11,
+      $12
     )
     RETURNING id
   `,
@@ -1015,6 +1005,8 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
         propina,
         aplicarItbis,
         itbis,
+        descuentoPorcentaje > 0 ? "PORCENTAJE" : null,
+        descuento,
       ],
     );
 
@@ -1059,10 +1051,6 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
           null,
         ],
       );
-
-      // ========================================
-      // INVENTARIO
-      // ========================================
 
       // ========================================
       // INVENTARIO
@@ -1224,7 +1212,16 @@ router.post("/cuentas/:cuentaId/cerrar", validarToken, async (req, res) => {
       mesa_id: cuenta.mesa_id,
 
       mesa_nombre: cuenta.mesa_nombre,
+
       subtotal,
+
+      descuento_tipo: descuentoPorcentaje > 0 ? "PORCENTAJE" : null,
+
+      descuento_porcentaje: descuentoPorcentaje,
+
+      descuento,
+
+      subtotal_con_descuento: subtotalConDescuento,
 
       propina_aplicada: aplicarPropina,
 
