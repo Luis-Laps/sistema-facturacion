@@ -68,6 +68,70 @@ function Dashboard() {
   };
 
   // ==========================================
+  // FORMATO DE HORA DE CAJA
+  // ==========================================
+  // Las columnas fecha_apertura y fecha_cierre
+  // son timestamp without time zone y representan
+  // la hora local almacenada en la base de datos.
+  //
+  // Por eso NO usamos new Date() para convertirla
+  // de UTC a otra zona.
+
+  const formatearHoraCaja = (fecha) => {
+    if (!fecha) {
+      return "-";
+    }
+
+    const texto = String(fecha);
+
+    // PostgreSQL normalmente devuelve:
+    // 2026-09-04T23:03:38.842681
+    // o:
+    // 2026-09-04 23:03:38.842681
+
+    const match = texto.match(/[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
+
+    if (match) {
+      const hora = Number(match[1]);
+      const minutos = match[2];
+
+      const periodo = hora >= 12 ? "p. m." : "a. m.";
+
+      let hora12 = hora % 12;
+
+      if (hora12 === 0) {
+        hora12 = 12;
+      }
+
+      return `${String(hora12).padStart(2, "0")}:${minutos} ${periodo}`;
+    }
+
+    return String(fecha);
+  };
+
+  // ==========================================
+  // FORMATO DE FECHA
+  // ==========================================
+
+  const formatearFecha = (fecha) => {
+    if (!fecha) {
+      return "-";
+    }
+
+    const texto = String(fecha);
+
+    const match = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if (match) {
+      const [, year, month, day] = match;
+
+      return `${day}/${month}/${year}`;
+    }
+
+    return String(fecha);
+  };
+
+  // ==========================================
   // CARGAR DASHBOARD
   // ==========================================
 
@@ -148,6 +212,7 @@ function Dashboard() {
       fecha.setDate(fecha.getDate() - 6);
 
       nuevaDesde = obtenerFechaLocal(fecha);
+
       nuevaHasta = hoy;
     }
 
@@ -157,9 +222,7 @@ function Dashboard() {
     }
 
     setFiltroActivo(tipo);
-
     setDesde(nuevaDesde);
-
     setHasta(nuevaHasta);
   };
 
@@ -182,6 +245,7 @@ function Dashboard() {
       confirmButtonColor: "#198754",
       showCancelButton: true,
       cancelButtonText: "Cancelar",
+
       inputValidator: (value) => {
         if (value === "") {
           return "Debe indicar un monto.";
@@ -193,7 +257,9 @@ function Dashboard() {
       },
     });
 
-    if (!isConfirmed) return;
+    if (!isConfirmed) {
+      return;
+    }
 
     try {
       await api.post("/cajas/abrir", {
@@ -222,44 +288,42 @@ function Dashboard() {
   // ==========================================
 
   const cerrarCaja = async () => {
-    if (!cajaAbierta) return;
+    if (!cajaAbierta) {
+      return;
+    }
 
     const debeHaber =
       Number(cajaAbierta.monto_inicial || 0) +
       Number(cajaAbierta.efectivo || 0);
 
-    // ==========================================
-    // MODAL DE CIERRE
-    // ==========================================
-
     const { value, isConfirmed } = await Swal.fire({
       title: "Cerrar Caja",
 
       html: `
-        <div style="text-align:left">
+          <div style="text-align:left">
 
-          <div class="mb-2">
-            <strong>Monto inicial:</strong>
-            RD$ ${moneda(cajaAbierta.monto_inicial)}
+            <div class="mb-2">
+              <strong>Monto inicial:</strong>
+              RD$ ${moneda(cajaAbierta.monto_inicial)}
+            </div>
+
+            <div class="mb-2">
+              <strong>Ventas en efectivo:</strong>
+              RD$ ${moneda(cajaAbierta.efectivo)}
+            </div>
+
+            <hr>
+
+            <div>
+              <strong>Debe haber:</strong>
+            </div>
+
+            <h3 style="color:#198754">
+              RD$ ${moneda(debeHaber)}
+            </h3>
+
           </div>
-
-          <div class="mb-2">
-            <strong>Ventas en efectivo:</strong>
-            RD$ ${moneda(cajaAbierta.efectivo)}
-          </div>
-
-          <hr>
-
-          <div>
-            <strong>Debe haber:</strong>
-          </div>
-
-          <h3 style="color:#198754">
-            RD$ ${moneda(debeHaber)}
-          </h3>
-
-        </div>
-      `,
+        `,
 
       input: "number",
 
@@ -291,7 +355,9 @@ function Dashboard() {
       },
     });
 
-    if (!isConfirmed) return;
+    if (!isConfirmed) {
+      return;
+    }
 
     try {
       const response = await api.post("/cajas/cerrar", {
@@ -299,10 +365,6 @@ function Dashboard() {
       });
 
       await verificarCaja();
-
-      // ==========================================
-      // RESULTADO DEL CIERRE
-      // ==========================================
 
       Swal.fire({
         icon: "success",
@@ -673,7 +735,7 @@ function Dashboard() {
 
           {/* ======================================
               PROPINAS
-              SOLO CONTROL DE ORDEN
+              SOLO EMPRESAS CON CONTROL DE ORDEN
           ====================================== */}
 
           {datos.manejoMesas && (
@@ -753,21 +815,19 @@ function Dashboard() {
                 </div>
 
                 <div className="row g-3">
+                  {/* APERTURA */}
+
                   <div className="col-12 col-md-3">
                     <div className="border rounded p-3 h-100">
                       <div className="text-muted small">Apertura</div>
 
                       <div className="fw-bold mt-1">
-                        {new Date(
-                          cajaAbierta.fecha_apertura,
-                        ).toLocaleTimeString("es-DO", {
-                          timeZone: "America/Santo_Domingo",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatearHoraCaja(cajaAbierta.fecha_apertura)}
                       </div>
                     </div>
                   </div>
+
+                  {/* MONTO INICIAL */}
 
                   <div className="col-12 col-md-3">
                     <div className="border rounded p-3 h-100">
@@ -779,6 +839,8 @@ function Dashboard() {
                     </div>
                   </div>
 
+                  {/* EFECTIVO */}
+
                   <div className="col-12 col-md-3">
                     <div className="border rounded p-3 h-100">
                       <div className="text-muted small">Ventas en efectivo</div>
@@ -788,6 +850,8 @@ function Dashboard() {
                       </div>
                     </div>
                   </div>
+
+                  {/* DEBE HABER */}
 
                   <div className="col-12 col-md-3">
                     <div className="border rounded p-3 h-100">
@@ -878,11 +942,7 @@ function Dashboard() {
                         <td>{factura.cliente || "Cliente general"}</td>
 
                         <td className="text-muted">
-                          {new Date(factura.fecha).toLocaleDateString("es-DO", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {formatearFecha(factura.fecha)}
                         </td>
 
                         <td className="text-end px-4 fw-semibold">

@@ -36,6 +36,7 @@ router.get("/abierta", validarToken, async (req, res) => {
 
 // =======================================
 // HISTORIAL DE REPORTES
+// TODAS LAS CAJAS DE LA EMPRESA
 // =======================================
 
 router.get("/reportes", validarToken, async (req, res) => {
@@ -58,6 +59,8 @@ router.get("/reportes", validarToken, async (req, res) => {
         c.cantidad_facturas,
         c.cantidad_productos,
         c.estado,
+
+        u.nombre AS usuario_nombre,
 
         COALESCE(
           (
@@ -83,12 +86,15 @@ router.get("/reportes", validarToken, async (req, res) => {
 
       FROM cajas c
 
-      WHERE c.usuario_id = $1
-      AND c.empresa_id = $2
+      LEFT JOIN usuarios u
+        ON u.id = c.usuario_id
+        AND u.empresa_id = c.empresa_id
+
+      WHERE c.empresa_id = $1
 
       ORDER BY c.fecha_apertura DESC
       `,
-      [req.usuario.id, req.usuario.empresa_id],
+      [req.usuario.empresa_id],
     );
 
     res.json(result.rows);
@@ -103,13 +109,14 @@ router.get("/reportes", validarToken, async (req, res) => {
 
 // =======================================
 // VENTAS DETALLADAS DE UN REPORTE DE CAJA
+// TODAS LAS CAJAS DE LA EMPRESA
 // =======================================
 
 router.get("/reportes/:id/ventas", validarToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar que la caja pertenece al usuario y empresa
+    // Verificar que la caja pertenece a la empresa
     const cajaResult = await pool.query(
       `
       SELECT
@@ -117,19 +124,57 @@ router.get("/reportes/:id/ventas", validarToken, async (req, res) => {
         c.fecha_apertura,
         c.fecha_cierre,
         c.estado,
+        c.monto_inicial,
+        c.efectivo,
+        c.tarjeta,
+        c.transferencia,
+        c.dinero_contado,
+        c.diferencia,
+        c.total_ventas,
+        c.total_costos,
+        c.ganancia,
+        c.cantidad_facturas,
+        c.cantidad_productos,
+
         e.nombre AS empresa,
-        u.nombre AS usuario_nombre
+
+        u.nombre AS usuario_nombre,
+
+        COALESCE(
+          (
+            SELECT COUNT(*)
+            FROM facturas f
+            WHERE f.caja_id = c.id
+            AND f.empresa_id = c.empresa_id
+            AND f.propina_aplicada = TRUE
+          ),
+          0
+        ) AS cantidad_propinas_aplicadas,
+
+        COALESCE(
+          (
+            SELECT SUM(COALESCE(f.propina, 0))
+            FROM facturas f
+            WHERE f.caja_id = c.id
+            AND f.empresa_id = c.empresa_id
+            AND f.propina_aplicada = TRUE
+          ),
+          0
+        ) AS total_propinas
+
       FROM cajas c
+
       INNER JOIN empresas e
         ON e.id = c.empresa_id
+
       LEFT JOIN usuarios u
         ON u.id = c.usuario_id
         AND u.empresa_id = c.empresa_id
+
       WHERE c.id = $1
-      AND c.usuario_id = $2
-      AND c.empresa_id = $3
+      AND c.empresa_id = $2
       `,
-      [id, req.usuario.id, req.usuario.empresa_id],
+      [id, req.usuario.empresa_id],
     );
 
     if (cajaResult.rows.length === 0) {
@@ -194,6 +239,7 @@ router.get("/reportes/:id/ventas", validarToken, async (req, res) => {
 
 // =======================================
 // DETALLE DE UN REPORTE DE CAJA
+// TODAS LAS CAJAS DE LA EMPRESA
 // =======================================
 
 router.get("/reportes/:id", validarToken, async (req, res) => {
@@ -219,6 +265,8 @@ router.get("/reportes/:id", validarToken, async (req, res) => {
         c.cantidad_productos,
         c.estado,
 
+        u.nombre AS usuario_nombre,
+
         COALESCE(
           (
             SELECT COUNT(*)
@@ -243,11 +291,14 @@ router.get("/reportes/:id", validarToken, async (req, res) => {
 
       FROM cajas c
 
+      LEFT JOIN usuarios u
+        ON u.id = c.usuario_id
+        AND u.empresa_id = c.empresa_id
+
       WHERE c.id = $1
-      AND c.usuario_id = $2
-      AND c.empresa_id = $3
+      AND c.empresa_id = $2
       `,
-      [id, req.usuario.id, req.usuario.empresa_id],
+      [id, req.usuario.empresa_id],
     );
 
     if (result.rows.length === 0) {

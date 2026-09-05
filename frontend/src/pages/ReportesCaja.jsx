@@ -8,12 +8,61 @@ function ReportesCaja() {
   const [cargando, setCargando] = useState(true);
 
   const [reporteSeleccionado, setReporteSeleccionado] = useState(null);
+
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
   const [descargandoPDF, setDescargandoPDF] = useState(null);
 
   // ==========================================
-  // OBTENER REPORTES
+  // DINERO
+  // ==========================================
+
+  const dinero = (valor) =>
+    Number(valor || 0).toLocaleString("es-DO", {
+      style: "currency",
+      currency: "DOP",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  // ==========================================
+  // FECHA SIN DESPLAZAR ZONA HORARIA
+  // ==========================================
+
+  const formatearFecha = (fecha) => {
+    if (!fecha) {
+      return "-";
+    }
+
+    const texto = String(fecha);
+
+    const match = texto.match(
+      /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/,
+    );
+
+    if (!match) {
+      return texto;
+    }
+
+    const [, year, month, day, hora, minutos, segundos] = match;
+
+    const horaNumero = Number(hora);
+
+    const periodo = horaNumero >= 12 ? "p. m." : "a. m.";
+
+    let hora12 = horaNumero % 12;
+
+    if (hora12 === 0) {
+      hora12 = 12;
+    }
+
+    const horaFormateada = `${String(hora12).padStart(2, "0")}:${minutos}`;
+
+    return `${day}/${month}/${year} ${horaFormateada} ${periodo}`;
+  };
+
+  // ==========================================
+  // REPORTES
   // ==========================================
 
   useEffect(() => {
@@ -22,13 +71,17 @@ function ReportesCaja() {
 
   const obtenerReportes = async () => {
     try {
-      const res = await api.get("/cajas/reportes");
+      setCargando(true);
 
-      setReportes(res.data);
+      const response = await api.get("/cajas/reportes");
+
+      setReportes(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error(error);
+      console.error("Error al obtener reportes:", error);
 
-      alert("No fue posible obtener los reportes.");
+      alert(
+        error.response?.data?.mensaje || "No fue posible obtener los reportes.",
+      );
     } finally {
       setCargando(false);
     }
@@ -42,29 +95,19 @@ function ReportesCaja() {
     try {
       setCargandoDetalle(true);
 
-      const res = await api.get(`/cajas/reportes/${id}`);
+      const response = await api.get(`/cajas/reportes/${id}`);
 
-      setReporteSeleccionado(res.data);
+      setReporteSeleccionado(response.data);
     } catch (error) {
-      console.error(error);
+      console.error("Error al obtener reporte:", error);
 
-      alert("No fue posible obtener el reporte.");
+      alert(
+        error.response?.data?.mensaje || "No fue posible obtener el reporte.",
+      );
     } finally {
       setCargandoDetalle(false);
     }
   };
-
-  // ==========================================
-  // FORMATO DINERO
-  // ==========================================
-
-  const dinero = (valor) =>
-    Number(valor || 0).toLocaleString("es-DO", {
-      style: "currency",
-      currency: "DOP",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
 
   // ==========================================
   // RESUMEN
@@ -110,13 +153,8 @@ function ReportesCaja() {
 
       const { caja, ventas } = response.data;
 
-      // Buscar información adicional del reporte
-      const reporteCaja = reportes.find(
-        (r) => Number(r.id) === Number(caja.id),
-      );
-
       // ========================================
-      // CREAR DOCUMENTO
+      // DOCUMENTO
       // ========================================
 
       const doc = new jsPDF({
@@ -126,7 +164,9 @@ function ReportesCaja() {
       });
 
       const margen = 15;
+
       const anchoPagina = 210;
+
       const anchoUtil = anchoPagina - margen * 2;
 
       let y = 18;
@@ -136,6 +176,7 @@ function ReportesCaja() {
       // ========================================
 
       doc.setFont("helvetica", "bold");
+
       doc.setFontSize(18);
 
       doc.text("REPORTE DE CAJA", anchoPagina / 2, y, {
@@ -159,10 +200,11 @@ function ReportesCaja() {
       y += 8;
 
       // ========================================
-      // INFORMACIÓN DE LA CAJA
+      // INFORMACIÓN
       // ========================================
 
       doc.setFont("helvetica", "normal");
+
       doc.setFontSize(10);
 
       doc.text(`Empresa: ${caja.empresa || "Empresa"}`, margen, y);
@@ -173,35 +215,20 @@ function ReportesCaja() {
 
       y += 6;
 
-      doc.text(
-        `Apertura: ${
-          caja.fecha_apertura
-            ? new Date(caja.fecha_apertura).toLocaleString("es-DO")
-            : "-"
-        }`,
-        margen,
-        y,
-      );
+      doc.text(`Apertura: ${formatearFecha(caja.fecha_apertura)}`, margen, y);
 
       y += 6;
 
-      doc.text(
-        `Cierre: ${
-          caja.fecha_cierre
-            ? new Date(caja.fecha_cierre).toLocaleString("es-DO")
-            : "-"
-        }`,
-        margen,
-        y,
-      );
+      doc.text(`Cierre: ${formatearFecha(caja.fecha_cierre)}`, margen, y);
 
       y += 10;
 
       // ========================================
-      // TÍTULO VENTAS
+      // VENTAS
       // ========================================
 
       doc.setFont("helvetica", "bold");
+
       doc.setFontSize(13);
 
       doc.text("VENTAS", margen, y);
@@ -215,7 +242,7 @@ function ReportesCaja() {
       y += 7;
 
       // ========================================
-      // AGRUPAR VENTAS
+      // AGRUPAR FACTURAS
       // ========================================
 
       const ventasAgrupadas = {};
@@ -227,6 +254,8 @@ function ReportesCaja() {
             fecha: item.fecha,
             total: Number(item.total || 0),
             forma_pago: item.forma_pago,
+            propina_aplicada: item.propina_aplicada,
+            propina: Number(item.propina || 0),
             productos: [],
           };
         }
@@ -240,10 +269,11 @@ function ReportesCaja() {
       const listaVentas = Object.values(ventasAgrupadas);
 
       // ========================================
-      // MOSTRAR CADA VENTA
+      // MOSTRAR VENTAS
       // ========================================
 
       doc.setFont("helvetica", "normal");
+
       doc.setFontSize(10);
 
       listaVentas.forEach((venta) => {
@@ -255,7 +285,6 @@ function ReportesCaja() {
 
         const lineasTexto = doc.splitTextToSize(linea, anchoUtil - 45);
 
-        // Revisar espacio antes de imprimir
         if (y + lineasTexto.length * 5 + 15 > 280) {
           doc.addPage();
 
@@ -274,13 +303,15 @@ function ReportesCaja() {
 
         doc.setTextColor(100, 100, 100);
 
-        doc.text(
-          `${venta.forma_pago || "N/A"} · ${
-            venta.fecha ? new Date(venta.fecha).toLocaleString("es-DO") : ""
-          }`,
-          margen,
-          y,
-        );
+        let informacionVenta = `${venta.forma_pago || "N/A"} · ${formatearFecha(
+          venta.fecha,
+        )}`;
+
+        if (venta.propina_aplicada === true && venta.propina > 0) {
+          informacionVenta += ` · Propina ${dinero(venta.propina)}`;
+        }
+
+        doc.text(informacionVenta, margen, y);
 
         doc.setFontSize(10);
 
@@ -290,10 +321,10 @@ function ReportesCaja() {
       });
 
       // ========================================
-      // RESUMEN FINAL
+      // RESUMEN
       // ========================================
 
-      if (y + 90 > 280) {
+      if (y + 100 > 280) {
         doc.addPage();
 
         y = 18;
@@ -306,11 +337,6 @@ function ReportesCaja() {
       doc.line(margen, y, anchoPagina - margen, y);
 
       y += 9;
-
-      const totalVentas = listaVentas.reduce(
-        (total, venta) => total + Number(venta.total || 0),
-        0,
-      );
 
       doc.setFont("helvetica", "bold");
 
@@ -326,66 +352,70 @@ function ReportesCaja() {
 
       // Total ventas
 
-      doc.text(`Total ventas: ${dinero(totalVentas)}`, margen, y);
+      doc.text(`Total ventas: ${dinero(caja.total_ventas)}`, margen, y);
 
       y += 6;
 
       // Efectivo
 
-      doc.text(`Efectivo: ${dinero(reporteCaja?.efectivo)}`, margen, y);
+      doc.text(`Efectivo: ${dinero(caja.efectivo)}`, margen, y);
 
       y += 6;
 
       // Tarjeta
 
-      doc.text(`Tarjeta: ${dinero(reporteCaja?.tarjeta)}`, margen, y);
+      doc.text(`Tarjeta: ${dinero(caja.tarjeta)}`, margen, y);
 
       y += 6;
 
       // Transferencia
 
-      doc.text(
-        `Transferencia: ${dinero(reporteCaja?.transferencia)}`,
-        margen,
-        y,
-      );
+      doc.text(`Transferencia: ${dinero(caja.transferencia)}`, margen, y);
 
-      y += 9;
+      y += 8;
 
       // Facturas
 
-      doc.text(`Facturas: ${listaVentas.length}`, margen, y);
-
-      y += 6;
-
-      // Propinas aplicadas
-
       doc.text(
-        `Propinas aplicadas: ${reporteCaja?.cantidad_propinas_aplicadas || 0}`,
+        `Facturas: ${caja.cantidad_facturas || listaVentas.length}`,
         margen,
         y,
       );
 
       y += 6;
 
-      // Total propinas
+      // Propinas cantidad
 
       doc.text(
-        `Total propinas: ${dinero(reporteCaja?.total_propinas)}`,
+        `Propinas aplicadas: ${caja.cantidad_propinas_aplicadas || 0}`,
         margen,
         y,
       );
 
       y += 6;
 
-      // Productos vendidos
+      // Propinas monto
 
-      const cantidadProductos = ventas.reduce(
-        (total, item) => total + Number(item.cantidad || 0),
-        0,
+      doc.text(`Total propinas: ${dinero(caja.total_propinas)}`, margen, y);
+
+      y += 6;
+
+      // Productos
+
+      doc.text(
+        `Productos vendidos: ${
+          caja.cantidad_productos ||
+          ventas.reduce((total, item) => total + Number(item.cantidad || 0), 0)
+        }`,
+        margen,
+        y,
       );
 
-      doc.text(`Productos vendidos: ${cantidadProductos}`, margen, y);
+      y += 6;
+
+      // Ganancia
+
+      doc.text(`Ganancia: ${dinero(caja.ganancia)}`, margen, y);
 
       // ========================================
       // PIE
@@ -408,12 +438,12 @@ function ReportesCaja() {
       });
 
       // ========================================
-      // DESCARGAR
+      // GUARDAR
       // ========================================
 
       doc.save(`Reporte-Caja-${caja.id}.pdf`);
     } catch (error) {
-      console.error(error);
+      console.error("Error generando PDF:", error);
 
       alert(error.response?.data?.mensaje || "No fue posible generar el PDF.");
     } finally {
@@ -429,188 +459,212 @@ function ReportesCaja() {
     <>
       <Navbar />
 
-      <div className="container mt-4">
-        <h2 className="mb-4">Reportes de Caja</h2>
+      <div className="container-fluid px-3 px-md-4 py-4">
+        {/* ======================================
+            ENCABEZADO
+        ====================================== */}
 
-        {/* ==========================================
-            TARJETAS DE RESUMEN
-        ========================================== */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+          <div>
+            <h2 className="fw-bold mb-1">Reportes de Caja</h2>
 
-        <div className="row row-cols-1 row-cols-md-5 g-3 mb-4">
-          {/* TOTAL VENDIDO */}
+            <p className="text-muted mb-0">Historial de cajas de la empresa</p>
+          </div>
+        </div>
 
-          <div className="col">
-            <div className="card text-bg-success h-100">
+        {/* ======================================
+            RESUMEN
+        ====================================== */}
+
+        <div className="row g-3 mb-4">
+          <div className="col-12 col-sm-6 col-lg-3">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <h6>Total vendido</h6>
+                <div className="text-muted small mb-2">Total vendido</div>
 
-                <h3>{dinero(resumen.ventas)}</h3>
+                <div className="fs-3 fw-bold">{dinero(resumen.ventas)}</div>
               </div>
             </div>
           </div>
 
-          {/* GANANCIAS */}
-
-          <div className="col">
-            <div className="card text-bg-primary h-100">
+          <div className="col-12 col-sm-6 col-lg-3">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <h6>Ganancias</h6>
+                <div className="text-muted small mb-2">Ganancias</div>
 
-                <h3>{dinero(resumen.ganancias)}</h3>
+                <div className="fs-3 fw-bold text-success">
+                  {dinero(resumen.ganancias)}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* FACTURAS */}
-
-          <div className="col">
-            <div className="card text-bg-warning h-100">
+          <div className="col-12 col-sm-6 col-lg-3">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <h6>Facturas</h6>
+                <div className="text-muted small mb-2">Facturas</div>
 
-                <h3>{resumen.facturas}</h3>
+                <div className="fs-3 fw-bold">{resumen.facturas}</div>
               </div>
             </div>
           </div>
 
-          {/* PROPINAS */}
-
-          <div className="col">
-            <div className="card text-bg-info h-100">
+          <div className="col-12 col-sm-6 col-lg-3">
+            <div className="card border-0 shadow-sm h-100">
               <div className="card-body">
-                <h6>Propinas aplicadas</h6>
+                <div className="text-muted small mb-2">Propinas</div>
 
-                <h3>{resumen.propinas}</h3>
+                <div className="fs-3 fw-bold text-primary">
+                  {dinero(resumen.totalPropinas)}
+                </div>
 
-                <small>{dinero(resumen.totalPropinas)}</small>
-              </div>
-            </div>
-          </div>
-
-          {/* PRODUCTOS */}
-
-          <div className="col">
-            <div className="card bg-dark text-white h-100">
-              <div className="card-body">
-                <h6>Productos</h6>
-
-                <h3>{resumen.productos}</h3>
+                <div className="small text-muted mt-2">
+                  {resumen.propinas}{" "}
+                  {resumen.propinas === 1
+                    ? "propina aplicada"
+                    : "propinas aplicadas"}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ==========================================
+        {/* ======================================
             HISTORIAL
-        ========================================== */}
+        ====================================== */}
 
-        <div className="card">
-          <div className="card-header">Historial de cierres</div>
+        <div className="card border-0 shadow-sm">
+          <div className="card-body p-0">
+            <div className="p-4 border-bottom">
+              <h5 className="fw-bold mb-1">Historial de cajas</h5>
 
-          <div className="card-body">
-            {cargando ? (
-              <p>Cargando...</p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-hover align-middle">
-                  <thead>
+              <div className="small text-muted">
+                Cajas registradas por todos los cajeros de la empresa
+              </div>
+            </div>
+
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th className="px-4">Caja</th>
+
+                    <th>Cajero</th>
+
+                    <th>Apertura</th>
+
+                    <th>Cierre</th>
+
+                    <th>Ventas</th>
+
+                    <th>Ganancia</th>
+
+                    <th>Facturas</th>
+
+                    <th>Propinas</th>
+
+                    <th>Estado</th>
+
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {cargando ? (
                     <tr>
-                      <th>#</th>
-                      <th>Apertura</th>
-                      <th>Cierre</th>
-                      <th>Ventas</th>
-                      <th>Ganancia</th>
-                      <th>Facturas</th>
-                      <th>Propinas</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
+                      <td colSpan="10" className="text-center py-5">
+                        Cargando reportes...
+                      </td>
                     </tr>
-                  </thead>
+                  ) : reportes.length > 0 ? (
+                    reportes.map((reporte) => (
+                      <tr key={reporte.id}>
+                        <td className="px-4 fw-semibold">#{reporte.id}</td>
 
-                  <tbody>
-                    {reportes.length > 0 ? (
-                      reportes.map((r) => (
-                        <tr key={r.id}>
-                          <td>{r.id}</td>
+                        <td>{reporte.usuario_nombre || "N/A"}</td>
 
-                          <td>{new Date(r.fecha_apertura).toLocaleString()}</td>
+                        <td>{formatearFecha(reporte.fecha_apertura)}</td>
 
-                          <td>
-                            {r.fecha_cierre
-                              ? new Date(r.fecha_cierre).toLocaleString()
-                              : "-"}
-                          </td>
+                        <td>{formatearFecha(reporte.fecha_cierre)}</td>
 
-                          <td>{dinero(r.total_ventas)}</td>
+                        <td>{dinero(reporte.total_ventas)}</td>
 
-                          <td>{dinero(r.ganancia)}</td>
+                        <td>{dinero(reporte.ganancia)}</td>
 
-                          <td>{r.cantidad_facturas}</td>
+                        <td>{reporte.cantidad_facturas || 0}</td>
 
-                          <td>
-                            <div className="fw-semibold">
-                              {r.cantidad_propinas_aplicadas || 0}
-                            </div>
+                        <td>
+                          <div className="fw-semibold">
+                            {reporte.cantidad_propinas_aplicadas || 0}
+                          </div>
 
-                            <small className="text-muted">
-                              {dinero(r.total_propinas)}
-                            </small>
-                          </td>
+                          <div className="small text-muted">
+                            {dinero(reporte.total_propinas)}
+                          </div>
+                        </td>
 
-                          <td>{r.estado}</td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              reporte.estado === "CERRADA"
+                                ? "text-bg-secondary"
+                                : "text-bg-success"
+                            }`}
+                          >
+                            {reporte.estado}
+                          </span>
+                        </td>
 
-                          <td>
-                            <div className="d-flex gap-2 flex-wrap">
-                              {/* VER */}
+                        <td>
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-outline-primary btn-sm"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalReporte"
+                              onClick={() => verReporte(reporte.id)}
+                            >
+                              Ver
+                            </button>
 
-                              <button
-                                className="btn btn-outline-primary btn-sm"
-                                data-bs-toggle="modal"
-                                data-bs-target="#modalReporte"
-                                onClick={() => verReporte(r.id)}
-                              >
-                                Ver
-                              </button>
-
-                              {/* PDF */}
-
-                              <button
-                                className="btn btn-outline-success btn-sm"
-                                onClick={() => descargarPDF(r.id)}
-                                disabled={descargandoPDF === r.id}
-                              >
-                                {descargandoPDF === r.id
-                                  ? "Generando..."
-                                  : "⬇ Descargar PDF"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="9" className="text-center py-5 text-muted">
-                          No hay reportes de caja registrados.
+                            <button
+                              className="btn btn-outline-success btn-sm"
+                              onClick={() => descargarPDF(reporte.id)}
+                              disabled={descargandoPDF === reporte.id}
+                            >
+                              {descargandoPDF === reporte.id
+                                ? "Generando..."
+                                : "⬇ PDF"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="10" className="text-center py-5 text-muted">
+                        No hay cajas registradas.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ==========================================
-          MODAL
+          MODAL DETALLE
       ========================================== */}
 
       <div className="modal fade" id="modalReporte" tabIndex="-1">
-        <div className="modal-dialog modal-xl">
+        <div className="modal-dialog modal-lg modal-dialog-centered">
           <div className="modal-content">
             <div className="modal-header">
-              <h5 className="modal-title">Reporte de Caja</h5>
+              <h5 className="modal-title fw-bold">
+                Detalle de Caja
+                {reporteSeleccionado ? ` #${reporteSeleccionado.id}` : ""}
+              </h5>
 
               <button
                 type="button"
@@ -621,164 +675,199 @@ function ReportesCaja() {
 
             <div className="modal-body">
               {cargandoDetalle ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border"></div>
+                <div className="text-center py-5">
+                  <div className="spinner-border" />
+
+                  <div className="mt-3 text-muted">Cargando reporte...</div>
                 </div>
-              ) : (
-                reporteSeleccionado && (
-                  <div className="row">
-                    {/* INFORMACIÓN DE CAJA */}
+              ) : reporteSeleccionado ? (
+                <div className="row g-3">
+                  {/* CAJERO */}
 
-                    <div className="col-md-6 mb-3">
-                      <div className="card h-100">
-                        <div className="card-body">
-                          <h5>Caja #{reporteSeleccionado.id}</h5>
+                  <div className="col-12">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Cajero</div>
 
-                          <p>
-                            <strong>Estado:</strong>{" "}
-                            {reporteSeleccionado.estado}
-                          </p>
-
-                          <p>
-                            <strong>Apertura:</strong>
-
-                            <br />
-
-                            {new Date(
-                              reporteSeleccionado.fecha_apertura,
-                            ).toLocaleString()}
-                          </p>
-
-                          <p>
-                            <strong>Cierre:</strong>
-
-                            <br />
-
-                            {reporteSeleccionado.fecha_cierre
-                              ? new Date(
-                                  reporteSeleccionado.fecha_cierre,
-                                ).toLocaleString("es-DO", {
-                                  timeZone: "America/Santo_Domingo",
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                              : "-"}
-                          </p>
-                        </div>
+                      <div className="fw-semibold mt-1">
+                        {reporteSeleccionado.usuario_nombre || "N/A"}
                       </div>
                     </div>
+                  </div>
 
-                    {/* RESUMEN */}
+                  {/* APERTURA */}
 
-                    <div className="col-md-6 mb-3">
-                      <div className="card h-100">
-                        <div className="card-body">
-                          <h5>Resumen</h5>
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Apertura</div>
 
-                          <p>
-                            <strong>Monto inicial:</strong>{" "}
-                            {dinero(reporteSeleccionado.monto_inicial)}
-                          </p>
+                      <div className="fw-semibold mt-1">
+                        {formatearFecha(reporteSeleccionado.fecha_apertura)}
+                      </div>
+                    </div>
+                  </div>
 
-                          <p>
-                            <strong>Total vendido:</strong>{" "}
-                            {dinero(reporteSeleccionado.total_ventas)}
-                          </p>
+                  {/* CIERRE */}
 
-                          <p>
-                            <strong>Ganancia:</strong>{" "}
-                            {dinero(reporteSeleccionado.ganancia)}
-                          </p>
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Cierre</div>
 
-                          <p>
-                            <strong>Facturas:</strong>{" "}
-                            {reporteSeleccionado.cantidad_facturas}
-                          </p>
+                      <div className="fw-semibold mt-1">
+                        {formatearFecha(reporteSeleccionado.fecha_cierre)}
+                      </div>
+                    </div>
+                  </div>
 
-                          <p>
-                            <strong>Propinas aplicadas:</strong>{" "}
+                  {/* TOTAL VENTAS */}
+
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Total ventas</div>
+
+                      <div className="fs-4 fw-bold mt-1">
+                        {dinero(reporteSeleccionado.total_ventas)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GANANCIA */}
+
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Ganancia</div>
+
+                      <div className="fs-4 fw-bold text-success mt-1">
+                        {dinero(reporteSeleccionado.ganancia)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EFECTIVO */}
+
+                  <div className="col-12 col-md-4">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Efectivo</div>
+
+                      <div className="fw-bold mt-1">
+                        {dinero(reporteSeleccionado.efectivo)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TARJETA */}
+
+                  <div className="col-12 col-md-4">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Tarjeta</div>
+
+                      <div className="fw-bold mt-1">
+                        {dinero(reporteSeleccionado.tarjeta)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TRANSFERENCIA */}
+
+                  <div className="col-12 col-md-4">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Transferencia</div>
+
+                      <div className="fw-bold mt-1">
+                        {dinero(reporteSeleccionado.transferencia)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FACTURAS */}
+
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Facturas</div>
+
+                      <div className="fs-4 fw-bold mt-1">
+                        {reporteSeleccionado.cantidad_facturas || 0}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PRODUCTOS */}
+
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Productos vendidos</div>
+
+                      <div className="fs-4 fw-bold mt-1">
+                        {reporteSeleccionado.cantidad_productos || 0}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PROPINAS */}
+
+                  <div className="col-12">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Propinas</div>
+
+                      <div className="d-flex flex-column flex-md-row gap-4 mt-1">
+                        <div>
+                          <div className="small text-muted">Cantidad</div>
+
+                          <div className="fs-5 fw-bold">
                             {reporteSeleccionado.cantidad_propinas_aplicadas ||
                               0}
-                          </p>
+                          </div>
+                        </div>
 
-                          <p>
-                            <strong>Total propinas:</strong>{" "}
+                        <div>
+                          <div className="small text-muted">Total</div>
+
+                          <div className="fs-5 fw-bold text-primary">
                             {dinero(reporteSeleccionado.total_propinas)}
-                          </p>
-
-                          <p>
-                            <strong>Productos:</strong>{" "}
-                            {reporteSeleccionado.cantidad_productos}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* EFECTIVO */}
-
-                    <div className="col-md-4">
-                      <div className="card">
-                        <div className="card-body">
-                          <h6>Efectivo</h6>
-
-                          <h3>{dinero(reporteSeleccionado.efectivo)}</h3>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* TARJETA */}
-
-                    <div className="col-md-4">
-                      <div className="card">
-                        <div className="card-body">
-                          <h6>Tarjeta</h6>
-
-                          <h3>{dinero(reporteSeleccionado.tarjeta)}</h3>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* TRANSFERENCIA */}
-
-                    <div className="col-md-4">
-                      <div className="card">
-                        <div className="card-body">
-                          <h6>Transferencia</h6>
-
-                          <h3>{dinero(reporteSeleccionado.transferencia)}</h3>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* DINERO CONTADO */}
-
-                    <div className="col-md-6 mt-3">
-                      <div className="card border-success">
-                        <div className="card-body">
-                          <h5>Dinero contado</h5>
-
-                          <h2>{dinero(reporteSeleccionado.dinero_contado)}</h2>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* DIFERENCIA */}
-
-                    <div className="col-md-6 mt-3">
-                      <div className="card border-danger">
-                        <div className="card-body">
-                          <h5>Diferencia</h5>
-
-                          <h2>{dinero(reporteSeleccionado.diferencia)}</h2>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                )
+
+                  {/* DINERO CONTADO */}
+
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Dinero contado</div>
+
+                      <div className="fs-4 fw-bold mt-1">
+                        {dinero(reporteSeleccionado.dinero_contado)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* DIFERENCIA */}
+
+                  <div className="col-12 col-md-6">
+                    <div className="border rounded p-3">
+                      <div className="small text-muted">Diferencia</div>
+
+                      <div className="fs-4 fw-bold mt-1">
+                        {dinero(reporteSeleccionado.diferencia)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-muted py-5">
+                  No se pudo cargar el reporte.
+                </div>
               )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

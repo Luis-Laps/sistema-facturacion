@@ -12,9 +12,15 @@ const validarToken = require("../middleware/auth");
 
 router.get("/", validarToken, async (req, res) => {
   try {
+    // ==========================================
+    // FECHA LOCAL REPÚBLICA DOMINICANA
+    // ==========================================
+
     const obtenerFechaLocal = (fecha = new Date()) => {
       const year = fecha.getFullYear();
+
       const month = String(fecha.getMonth() + 1).padStart(2, "0");
+
       const day = String(fecha.getDate()).padStart(2, "0");
 
       return `${year}-${month}-${day}`;
@@ -22,8 +28,10 @@ router.get("/", validarToken, async (req, res) => {
 
     const hoy = obtenerFechaLocal();
 
+    const ahora = new Date();
+
     const primerDiaMes = obtenerFechaLocal(
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      new Date(ahora.getFullYear(), ahora.getMonth(), 1),
     );
 
     const { desde = primerDiaMes, hasta = hoy } = req.query;
@@ -31,17 +39,33 @@ router.get("/", validarToken, async (req, res) => {
     const empresaId = req.usuario.empresa_id;
 
     // ==========================================
+    // VALIDAR FECHAS RECIBIDAS
+    // ==========================================
+
+    const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    const fechaDesdeValida = fechaRegex.test(desde);
+
+    const fechaHastaValida = fechaRegex.test(hasta);
+
+    if (!fechaDesdeValida || !fechaHastaValida) {
+      return res.status(400).json({
+        mensaje: "Las fechas deben tener el formato YYYY-MM-DD.",
+      });
+    }
+
+    // ==========================================
     // CONFIGURACIÓN DE LA EMPRESA
     // ==========================================
 
     const empresaResult = await pool.query(
       `
-      SELECT
-        manejo_mesas
-      FROM empresas
-      WHERE id = $1
-      LIMIT 1
-      `,
+        SELECT
+          manejo_mesas
+        FROM empresas
+        WHERE id = $1
+        LIMIT 1
+        `,
       [empresaId],
     );
 
@@ -59,11 +83,12 @@ router.get("/", validarToken, async (req, res) => {
 
     const productos = await pool.query(
       `
-      SELECT COUNT(*) AS total
-      FROM productos
-      WHERE empresa_id = $1
-      AND activo = TRUE
-      `,
+        SELECT
+          COUNT(*) AS total
+        FROM productos
+        WHERE empresa_id = $1
+        AND activo = TRUE
+        `,
       [empresaId],
     );
 
@@ -73,11 +98,12 @@ router.get("/", validarToken, async (req, res) => {
 
     const clientes = await pool.query(
       `
-      SELECT COUNT(*) AS total
-      FROM clientes
-      WHERE empresa_id = $1
-      AND activo = TRUE
-      `,
+        SELECT
+          COUNT(*) AS total
+        FROM clientes
+        WHERE empresa_id = $1
+        AND activo = TRUE
+        `,
       [empresaId],
     );
 
@@ -87,13 +113,18 @@ router.get("/", validarToken, async (req, res) => {
 
     const facturas = await pool.query(
       `
-      SELECT COUNT(*) AS total
-      FROM facturas
-      WHERE empresa_id = $1
-      AND fecha >= $2::date
-      AND fecha < ($3::date + INTERVAL '1 day')
-      `,
-      [empresaId, desde, hasta],
+        SELECT
+          COUNT(*) AS total
+        FROM facturas
+        WHERE empresa_id = $1
+
+        AND fecha >=
+          $2::timestamp
+
+        AND fecha <
+          ($3::date + INTERVAL '1 day')
+        `,
+      [empresaId, `${desde} 00:00:00`, hasta],
     );
 
     // ==========================================
@@ -102,14 +133,23 @@ router.get("/", validarToken, async (req, res) => {
 
     const ventas = await pool.query(
       `
-      SELECT
-        COALESCE(SUM(total), 0) AS total
-      FROM facturas
-      WHERE empresa_id = $1
-      AND fecha >= $2::date
-      AND fecha < ($3::date + INTERVAL '1 day')
-      `,
-      [empresaId, desde, hasta],
+        SELECT
+          COALESCE(
+            SUM(total),
+            0
+          ) AS total
+
+        FROM facturas
+
+        WHERE empresa_id = $1
+
+        AND fecha >=
+          $2::timestamp
+
+        AND fecha <
+          ($3::date + INTERVAL '1 day')
+        `,
+      [empresaId, `${desde} 00:00:00`, hasta],
     );
 
     // ==========================================
@@ -125,33 +165,39 @@ router.get("/", validarToken, async (req, res) => {
     if (manejoMesas) {
       const propinasResult = await pool.query(
         `
-        SELECT
-          COUNT(*) FILTER (
-            WHERE propina_aplicada = TRUE
-          ) AS cantidad,
+          SELECT
 
-          COALESCE(
-            SUM(
-              CASE
-                WHEN propina_aplicada = TRUE
-                THEN COALESCE(propina, 0)
-                ELSE 0
-              END
-            ),
-            0
-          ) AS total
+            COUNT(*) FILTER (
+              WHERE propina_aplicada = TRUE
+            ) AS cantidad,
 
-        FROM facturas
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN propina_aplicada = TRUE
+                  THEN COALESCE(propina, 0)
+                  ELSE 0
+                END
+              ),
+              0
+            ) AS total
 
-        WHERE empresa_id = $1
-        AND fecha >= $2::date
-        AND fecha < ($3::date + INTERVAL '1 day')
-        `,
-        [empresaId, desde, hasta],
+          FROM facturas
+
+          WHERE empresa_id = $1
+
+          AND fecha >=
+            $2::timestamp
+
+          AND fecha <
+            ($3::date + INTERVAL '1 day')
+          `,
+        [empresaId, `${desde} 00:00:00`, hasta],
       );
 
       propinas = {
         cantidad: Number(propinasResult.rows[0].cantidad || 0),
+
         total: Number(propinasResult.rows[0].total || 0),
       };
     }
@@ -162,60 +208,81 @@ router.get("/", validarToken, async (req, res) => {
 
     const ganancias = await pool.query(
       `
-      SELECT
-        COALESCE(
-          SUM(
-            CASE
+        SELECT
+          COALESCE(
+            SUM(
+              CASE
 
-              WHEN fd.es_servicio = TRUE THEN
+                WHEN fd.es_servicio = TRUE THEN
 
-                (
-                  fd.precio * fd.cantidad
-                )
+                  (
+                    fd.precio *
+                    fd.cantidad
+                  )
 
-                - COALESCE(fd.descuento, 0)
+                  - COALESCE(
+                      fd.descuento,
+                      0
+                    )
 
-                - (
-                  COALESCE(fd.costo_manual, 0)
-                  * fd.cantidad
-                )
+                  - (
+                    COALESCE(
+                      fd.costo_manual,
+                      0
+                    )
 
-              ELSE
+                    * fd.cantidad
+                  )
 
-                (
-                  fd.precio * fd.cantidad
-                )
+                ELSE
 
-                - COALESCE(fd.descuento, 0)
+                  (
+                    fd.precio *
+                    fd.cantidad
+                  )
 
-                - (
-                  COALESCE(p.costo_compra, 0)
-                  * fd.cantidad
-                )
+                  - COALESCE(
+                      fd.descuento,
+                      0
+                    )
 
-            END
-          ),
-          0
-        ) AS total
+                  - (
+                    COALESCE(
+                      p.costo_compra,
+                      0
+                    )
 
-      FROM factura_detalle fd
+                    * fd.cantidad
+                  )
 
-      INNER JOIN facturas f
-        ON f.id = fd.factura_id
+              END
+            ),
+            0
+          ) AS total
 
-      LEFT JOIN productos p
-        ON p.id = fd.producto_id
-        AND p.empresa_id = $1
+        FROM factura_detalle fd
 
-      WHERE f.empresa_id = $1
+        INNER JOIN facturas f
+          ON f.id =
+            fd.factura_id
 
-      AND f.fecha >= $2::date
+        LEFT JOIN productos p
+          ON p.id =
+            fd.producto_id
 
-      AND f.fecha < (
-        $3::date + INTERVAL '1 day'
-      )
-      `,
-      [empresaId, desde, hasta],
+          AND p.empresa_id =
+            $1
+
+        WHERE f.empresa_id =
+          $1
+
+        AND f.fecha >=
+          $2::timestamp
+
+        AND f.fecha <
+          ($3::date + INTERVAL '1 day')
+        `,
+      [empresaId, `${desde} 00:00:00`, hasta],
     );
 
     // ==========================================
@@ -224,56 +291,81 @@ router.get("/", validarToken, async (req, res) => {
 
     const ventasPorDia = await pool.query(
       `
-      SELECT
-        DATE(fecha) AS fecha,
+        SELECT
 
-        COALESCE(
-          SUM(total),
-          0
-        ) AS total
+          DATE(fecha) AS fecha,
 
-      FROM facturas
+          COALESCE(
+            SUM(total),
+            0
+          ) AS total
 
-      WHERE empresa_id = $1
+        FROM facturas
 
-      AND fecha >= $2::date
+        WHERE empresa_id =
+          $1
 
-      AND fecha < (
-        $3::date + INTERVAL '1 day'
-      )
+        AND fecha >=
+          $2::timestamp
 
-      GROUP BY DATE(fecha)
+        AND fecha <
+          ($3::date + INTERVAL '1 day')
 
-      ORDER BY DATE(fecha) ASC
-      `,
-      [empresaId, desde, hasta],
+        GROUP BY
+          DATE(fecha)
+
+        ORDER BY
+          DATE(fecha) ASC
+        `,
+      [empresaId, `${desde} 00:00:00`, hasta],
     );
 
     // ==========================================
     // ÚLTIMAS FACTURAS
     // ==========================================
+    // LEFT JOIN porque ahora una factura
+    // puede no tener cliente y debe mostrarse
+    // como "Consumidor final".
 
     const ultimasFacturas = await pool.query(
       `
-      SELECT
-        f.id,
-        f.fecha,
-        f.total,
-        c.nombre AS cliente
+        SELECT
 
-      FROM facturas f
+          f.id,
 
-      INNER JOIN clientes c
-        ON c.id = f.cliente_id
-        AND c.empresa_id = f.empresa_id
+          f.fecha,
 
-      WHERE f.empresa_id = $1
+          f.total,
 
-      ORDER BY f.id DESC
+          COALESCE(
+            c.nombre,
+            'Consumidor final'
+          ) AS cliente
 
-      LIMIT 10
-      `,
-      [empresaId],
+        FROM facturas f
+
+        LEFT JOIN clientes c
+          ON c.id =
+            f.cliente_id
+
+          AND c.empresa_id =
+            f.empresa_id
+
+        WHERE f.empresa_id =
+          $1
+
+        AND f.fecha >=
+          $2::timestamp
+
+        AND f.fecha <
+          ($3::date + INTERVAL '1 day')
+
+        ORDER BY
+          f.id DESC
+
+        LIMIT 10
+        `,
+      [empresaId, `${desde} 00:00:00`, hasta],
     );
 
     // ==========================================
@@ -291,13 +383,11 @@ router.get("/", validarToken, async (req, res) => {
 
       ganancias: Number(ganancias.rows[0].total),
 
-      // Indica al frontend si debe mostrar
-      // la tarjeta de propinas.
       manejoMesas,
 
-      // Estadísticas de propinas.
       propinas: {
         cantidad: propinas.cantidad,
+
         total: propinas.total,
       },
 
