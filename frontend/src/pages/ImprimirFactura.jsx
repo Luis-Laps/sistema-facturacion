@@ -16,13 +16,13 @@ function ImprimirFactura() {
       setFactura(facturaRes.data);
       setEmpresa(empresaRes.data);
     } catch (error) {
-      console.error(error);
+      console.error("Error al cargar factura:", error);
     }
   };
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [id]);
 
   if (!factura || !empresa) {
     return (
@@ -31,6 +31,34 @@ function ImprimirFactura() {
       </div>
     );
   }
+
+  const formatearMoneda = (valor) => {
+    return Number(valor || 0).toLocaleString("es-DO", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const datosFactura = factura.factura;
+
+  // Subtotal de los productos/servicios
+  const subtotalProductos = factura.detalle.reduce((total, item) => {
+    return total + Number(item.subtotal || 0);
+  }, 0);
+
+  // Descuento general de la factura
+  const descuento = Number(datosFactura.descuento || 0);
+  const descuentoTipo = datosFactura.descuento_tipo || null;
+
+  // Subtotal después del descuento
+  const subtotalConDescuento = Math.max(0, subtotalProductos - descuento);
+
+  // Propina e ITBIS
+  const propina = Number(datosFactura.propina || 0);
+  const itbis = Number(datosFactura.itbis || 0);
+
+  // Total final guardado en la factura
+  const total = Number(datosFactura.total || 0);
 
   return (
     <>
@@ -41,6 +69,9 @@ function ImprimirFactura() {
           margin: "0 auto",
         }}
       >
+        {/* ==========================================
+            ENCABEZADO
+        ========================================== */}
         <div className="text-center mb-4">
           <img
             src="/logo.png"
@@ -54,41 +85,48 @@ function ImprimirFactura() {
 
           <h2>{empresa.nombre}</h2>
 
-          <p className="mb-1">{empresa.telefono}</p>
-          <p className="mb-1">{empresa.direccion}</p>
-          <p>{empresa.correo}</p>
+          {empresa.telefono && <p className="mb-1">{empresa.telefono}</p>}
+
+          {empresa.direccion && <p className="mb-1">{empresa.direccion}</p>}
+
+          {empresa.correo && <p>{empresa.correo}</p>}
 
           <p className="text-muted">Reparación, Brillo y Pintura</p>
 
           <hr />
 
-          <h3>Factura #{factura.factura.id}</h3>
+          <h3>Factura #{datosFactura.id}</h3>
         </div>
 
-        {/* INFORMACIÓN DE LA FACTURA */}
+        {/* ==========================================
+            INFORMACIÓN DE LA FACTURA
+        ========================================== */}
         <div className="row mb-4">
           <div className="col-md-4">
-            <strong>Cliente:</strong> {factura.factura.cliente}
+            <strong>Cliente:</strong>{" "}
+            {datosFactura.cliente || "Consumidor final"}
           </div>
 
           <div className="col-md-4">
             <strong>Fecha:</strong>{" "}
-            {new Date(factura.factura.fecha).toLocaleDateString()}
+            {new Date(datosFactura.fecha).toLocaleDateString("es-DO")}
           </div>
 
           <div className="col-md-4 text-md-end">
             <strong>Forma de pago:</strong>{" "}
-            {factura.factura.forma_pago === "EFECTIVO"
+            {datosFactura.forma_pago === "EFECTIVO"
               ? "💵 Efectivo"
-              : factura.factura.forma_pago === "TARJETA"
+              : datosFactura.forma_pago === "TARJETA"
                 ? "💳 Tarjeta"
-                : factura.factura.forma_pago === "TRANSFERENCIA"
+                : datosFactura.forma_pago === "TRANSFERENCIA"
                   ? "🏦 Transferencia"
-                  : factura.factura.forma_pago || "No especificada"}
+                  : datosFactura.forma_pago || "No especificada"}
           </div>
         </div>
 
-        {/* DETALLE DE LA FACTURA */}
+        {/* ==========================================
+            DETALLE DE LA FACTURA
+        ========================================== */}
         <table className="table table-bordered">
           <thead className="table-light">
             <tr>
@@ -103,55 +141,114 @@ function ImprimirFactura() {
             {factura.detalle.map((item, index) => (
               <tr key={index}>
                 <td>{item.nombre}</td>
-
                 <td>{item.cantidad}</td>
-
-                <td>
-                  RD$
-                  {Number(item.precio).toLocaleString()}
-                </td>
-
-                <td>
-                  RD$
-                  {Number(item.subtotal).toLocaleString()}
-                </td>
+                <td>RD$ {formatearMoneda(item.precio)}</td>
+                <td>RD$ {formatearMoneda(item.subtotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* TOTAL */}
-        <h2
-          className="text-end mt-4"
+        {/* ==========================================
+            RESUMEN DE TOTALES
+        ========================================== */}
+        <div
+          className="mt-4"
           style={{
-            color: "#198754",
-            fontWeight: "bold",
+            maxWidth: "450px",
+            marginLeft: "auto",
           }}
         >
-          Total: RD$
-          {Number(factura.factura.total).toLocaleString()}
-        </h2>
+          {/* SUBTOTAL */}
+          <div className="d-flex justify-content-between mb-2">
+            <strong>Subtotal:</strong>
+
+            <span>RD$ {formatearMoneda(subtotalProductos)}</span>
+          </div>
+
+          {/* DESCUENTO GENERAL */}
+          {descuento > 0 && (
+            <>
+              <div className="d-flex justify-content-between mb-2">
+                <strong>
+                  Descuento
+                  {descuentoTipo ? ` (${descuentoTipo})` : ""}:
+                </strong>
+
+                <span className="text-danger">
+                  - RD$ {formatearMoneda(descuento)}
+                </span>
+              </div>
+
+              <div className="d-flex justify-content-between mb-2">
+                <strong>Subtotal con descuento:</strong>
+
+                <span>RD$ {formatearMoneda(subtotalConDescuento)}</span>
+              </div>
+            </>
+          )}
+
+          {/* PROPINA */}
+          {datosFactura.propina_aplicada && propina > 0 && (
+            <div className="d-flex justify-content-between mb-2">
+              <strong>Propina de ley (10%):</strong>
+
+              <span>RD$ {formatearMoneda(propina)}</span>
+            </div>
+          )}
+
+          {/* ITBIS */}
+          {datosFactura.itbis_aplicado && itbis > 0 && (
+            <div className="d-flex justify-content-between mb-2">
+              <strong>ITBIS (18%):</strong>
+
+              <span>RD$ {formatearMoneda(itbis)}</span>
+            </div>
+          )}
+
+          <hr />
+
+          {/* TOTAL */}
+          <h2
+            className="text-end mt-3"
+            style={{
+              color: "#198754",
+              fontWeight: "bold",
+            }}
+          >
+            Total: RD$ {formatearMoneda(total)}
+          </h2>
+        </div>
 
         <hr />
 
+        {/* ==========================================
+            PIE
+        ========================================== */}
         <p className="text-center mt-4">
-          Gracias por confiar en Byron Reparaciones
+          Gracias por confiar en {empresa.nombre}
         </p>
 
-        <p className="text-center">Tel: {empresa.telefono}</p>
+        {empresa.telefono && (
+          <p className="text-center">Tel: {empresa.telefono}</p>
+        )}
 
-        {/* BOTÓN IMPRIMIR */}
+        {/* ==========================================
+            BOTÓN IMPRIMIR
+        ========================================== */}
         <div className="text-center mt-4">
           <button
             className="btn btn-success no-print"
             onClick={() => window.print()}
           >
-            Imprimir Factura
+            🖨️ Imprimir Factura
           </button>
         </div>
       </div>
 
-      {/* ESTILOS DE IMPRESIÓN */}
+      {/* ==========================================
+          ESTILOS DE IMPRESIÓN
+      ========================================== */}
       <style>
         {`
           @media print {

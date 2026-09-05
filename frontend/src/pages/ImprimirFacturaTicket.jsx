@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+
 import "../styles/ticket.css";
 import api from "../services/api";
 
@@ -76,6 +77,45 @@ function ImprimirFacturaTicket() {
 
   const colorPrincipal = empresa.color_principal || "#198754";
 
+  const datosFactura = factura.factura;
+
+  // ==========================================
+  // CÁLCULOS
+  // ==========================================
+
+  // Subtotal de productos/servicios
+  const subtotalProductos = factura.detalle.reduce((total, item) => {
+    return total + Number(item.subtotal || 0);
+  }, 0);
+
+  // Descuento general de la factura
+  const descuento = Number(datosFactura.descuento || 0);
+
+  const descuentoTipo = datosFactura.descuento_tipo || null;
+
+  // Subtotal después del descuento
+  const subtotalConDescuento = Math.max(0, subtotalProductos - descuento);
+
+  // Propina
+  const propina = Number(datosFactura.propina || 0);
+
+  // ITBIS
+  const itbis = Number(datosFactura.itbis || 0);
+
+  // Total
+  const total = Number(datosFactura.total || 0);
+
+  // ==========================================
+  // FORMATEAR MONEDA
+  // ==========================================
+
+  const formatearMoneda = (valor) => {
+    return Number(valor || 0).toLocaleString("es-DO", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   // ==========================================
   // TICKET
   // ==========================================
@@ -119,8 +159,8 @@ function ImprimirFacturaTicket() {
 
         <p className="cajero">
           Cajero:{" "}
-          {factura.factura.usuario_nombre ||
-            factura.factura.usuario ||
+          {datosFactura.usuario_nombre ||
+            datosFactura.usuario ||
             "No identificado"}
         </p>
       </div>
@@ -132,19 +172,18 @@ function ImprimirFacturaTicket() {
       <div className="info-ticket">
         <div className="fila">
           <span>No. Factura</span>
-          <span>#{factura.factura.id}</span>
+          <span>#{datosFactura.id}</span>
         </div>
 
         <div className="fila">
           <span>Cliente</span>
-          <span>{factura.factura.cliente}</span>
+          <span>{datosFactura.cliente || "Consumidor final"}</span>
         </div>
 
         <div className="fila">
           <span>Fecha</span>
-
           <span>
-            {new Date(factura.factura.fecha).toLocaleString("es-DO", {
+            {new Date(datosFactura.fecha).toLocaleString("es-DO", {
               dateStyle: "short",
               timeStyle: "short",
             })}
@@ -165,31 +204,23 @@ function ImprimirFacturaTicket() {
           <div className="detalle-producto">
             <span>
               {item.cantidad} × RD$
-              {Number(item.precio).toLocaleString("es-DO", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatearMoneda(item.precio)}
             </span>
 
             <span>
               RD$
-              {Number(item.subtotal).toLocaleString("es-DO", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatearMoneda(item.subtotal)}
             </span>
           </div>
 
+          {/* Descuento individual del producto */}
           {Number(item.descuento || 0) > 0 && (
             <div className="detalle-producto">
               <span>Descuento</span>
 
               <span>
                 - RD$
-                {Number(item.descuento).toLocaleString("es-DO", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatearMoneda(item.descuento)}
               </span>
             </div>
           )}
@@ -204,64 +235,56 @@ function ImprimirFacturaTicket() {
 
       <div className="resumen-ticket">
         {/* SUBTOTAL */}
-
         <div className="fila">
           <span>Subtotal</span>
 
-          <span>
-            RD${" "}
-            {Number(
-              factura.detalle.reduce(
-                (total, item) => total + Number(item.subtotal || 0),
-                0,
-              ),
-            ).toLocaleString("es-DO", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
+          <span>RD$ {formatearMoneda(subtotalProductos)}</span>
         </div>
 
-        {/* ======================================
-            ITBIS
-        ====================================== */}
+        {/* DESCUENTO GENERAL */}
+        {descuento > 0 && (
+          <>
+            <div
+              className="fila"
+              style={{
+                color: "#dc3545",
+              }}
+            >
+              <span>
+                Descuento
+                {descuentoTipo ? ` (${descuentoTipo})` : ""}
+              </span>
 
-        {Number(factura.factura.itbis || 0) > 0 && (
+              <span>- RD$ {formatearMoneda(descuento)}</span>
+            </div>
+
+            <div className="fila">
+              <span>Subtotal con descuento</span>
+
+              <span>RD$ {formatearMoneda(subtotalConDescuento)}</span>
+            </div>
+          </>
+        )}
+
+        {/* ITBIS */}
+        {datosFactura.itbis_aplicado && itbis > 0 && (
           <div className="fila">
             <span>ITBIS (18%)</span>
 
-            <span>
-              RD${" "}
-              {Number(factura.factura.itbis).toLocaleString("es-DO", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+            <span>RD$ {formatearMoneda(itbis)}</span>
           </div>
         )}
 
-        {/* ======================================
-            PROPINA
-        ====================================== */}
-
-        {Number(factura.factura.propina || 0) > 0 && (
+        {/* PROPINA */}
+        {datosFactura.propina_aplicada && propina > 0 && (
           <div className="fila">
             <span>Propina de ley (10%)</span>
 
-            <span>
-              RD${" "}
-              {Number(factura.factura.propina).toLocaleString("es-DO", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+            <span>RD$ {formatearMoneda(propina)}</span>
           </div>
         )}
 
-        {/* ======================================
-            TOTAL
-        ====================================== */}
-
+        {/* TOTAL */}
         <div
           className="total"
           style={{
@@ -276,11 +299,7 @@ function ImprimirFacturaTicket() {
               color: colorPrincipal,
             }}
           >
-            RD${" "}
-            {Number(factura.factura.total).toLocaleString("es-DO", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            RD$ {formatearMoneda(total)}
           </div>
         </div>
       </div>
@@ -295,13 +314,13 @@ function ImprimirFacturaTicket() {
         <strong>Forma de pago</strong>
 
         <span>
-          {factura.factura.forma_pago === "EFECTIVO"
+          {datosFactura.forma_pago === "EFECTIVO"
             ? "💵 Efectivo"
-            : factura.factura.forma_pago === "TARJETA"
+            : datosFactura.forma_pago === "TARJETA"
               ? "💳 Tarjeta"
-              : factura.factura.forma_pago === "TRANSFERENCIA"
+              : datosFactura.forma_pago === "TRANSFERENCIA"
                 ? "🏦 Transferencia"
-                : factura.factura.forma_pago || "No especificada"}
+                : datosFactura.forma_pago || "No especificada"}
         </span>
       </div>
 

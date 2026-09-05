@@ -581,6 +581,8 @@ router.get("/:id", validarToken, async (req, res) => {
         f.fecha,
         f.total,
         f.forma_pago,
+        f.descuento_tipo,
+        f.descuento,
         f.propina_aplicada,
         f.propina,
         f.itbis_aplicado,
