@@ -30,20 +30,21 @@ router.get("/", validarToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-  id,
-  nombre,
-  rnc,
-  telefono,
-  direccion,
-  correo,
-  logo_url,
-  color_principal,
-  propina_ley,
-  itbis_ley,
-  manejo_mesas,
-  activo,
-  fecha_vencimiento
-FROM empresas
+        id,
+        nombre,
+        rnc,
+        telefono,
+        direccion,
+        correo,
+        logo_url,
+        color_principal,
+        tipo,
+        propina_ley,
+        itbis_ley,
+        manejo_mesas,
+        activo,
+        fecha_vencimiento
+      FROM empresas
       WHERE id = $1
       `,
       [req.usuario.empresa_id],
@@ -108,24 +109,25 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
         direccion = $4,
         correo = $5,
         logo_url = $6,
-       color_principal = $7,
-      propina_ley = $8,
-      itbis_ley = $9
+        color_principal = $7,
+        propina_ley = $8,
+        itbis_ley = $9
       WHERE id = $10
-     RETURNING
-  id,
-  nombre,
-  rnc,
-  telefono,
-  direccion,
-  correo,
-  logo_url,
-  color_principal,
-  propina_ley,
-  itbis_ley,
-  manejo_mesas,
-  activo,
-  fecha_vencimiento
+      RETURNING
+        id,
+        nombre,
+        rnc,
+        telefono,
+        direccion,
+        correo,
+        logo_url,
+        color_principal,
+        tipo,
+        propina_ley,
+        itbis_ley,
+        manejo_mesas,
+        activo,
+        fecha_vencimiento
       `,
       [
         nombre.trim(),

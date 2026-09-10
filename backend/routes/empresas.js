@@ -31,6 +31,7 @@ router.get("/", validarToken, async (req, res) => {
         correo,
         logo_url,
         color_principal,
+        tipo,
         propina_ley,
         itbis_ley,
         activo,
@@ -73,6 +74,7 @@ router.post("/", validarToken, async (req, res) => {
       correo,
       logo_url,
       color_principal,
+      tipo = "ESTANDAR",
       propina_ley,
       itbis_ley,
       admin_nombre,
@@ -87,6 +89,12 @@ router.post("/", validarToken, async (req, res) => {
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({
         mensaje: "El nombre de la empresa es obligatorio.",
+      });
+    }
+
+    if (!["ESTANDAR", "FERRETERIA"].includes(tipo)) {
+      return res.status(400).json({
+        mensaje: "El tipo de empresa no es válido.",
       });
     }
 
@@ -148,12 +156,13 @@ router.post("/", validarToken, async (req, res) => {
         correo,
         logo_url,
         color_principal,
+        tipo,
         propina_ley,
         itbis_ley,
         activo
       )
       VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
       RETURNING *
       `,
       [
@@ -164,6 +173,7 @@ router.post("/", validarToken, async (req, res) => {
         correo || null,
         logo_url || null,
         color_principal || "#198754",
+        tipo,
         propina_ley === true,
         itbis_ley === true,
       ],
@@ -254,8 +264,10 @@ router.put("/:id", validarToken, async (req, res) => {
       correo,
       logo_url,
       color_principal,
+      tipo = "ESTANDAR",
       propina_ley,
       itbis_ley,
+      activo,
     } = req.body;
 
     // ==========================================
@@ -265,6 +277,16 @@ router.put("/:id", validarToken, async (req, res) => {
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({
         mensaje: "El nombre de la empresa es obligatorio.",
+      });
+    }
+
+    // ==========================================
+    // VALIDAR TIPO
+    // ==========================================
+
+    if (!["ESTANDAR", "FERRETERIA"].includes(tipo)) {
+      return res.status(400).json({
+        mensaje: "El tipo de empresa no es válido.",
       });
     }
 
@@ -302,9 +324,11 @@ router.put("/:id", validarToken, async (req, res) => {
         correo = $5,
         logo_url = $6,
         color_principal = $7,
-        propina_ley = $8,
-        itbis_ley = $9
-      WHERE id = $10
+        tipo = $8,
+        propina_ley = $9,
+        itbis_ley = $10,
+        activo = COALESCE($11, activo)
+      WHERE id = $12
       RETURNING
         id,
         nombre,
@@ -314,6 +338,7 @@ router.put("/:id", validarToken, async (req, res) => {
         correo,
         logo_url,
         color_principal,
+        tipo,
         propina_ley,
         itbis_ley,
         activo,
@@ -328,8 +353,10 @@ router.put("/:id", validarToken, async (req, res) => {
         correo || null,
         logo_url || null,
         color_principal || "#198754",
+        tipo,
         propina_ley === true,
         itbis_ley === true,
+        typeof activo === "boolean" ? activo : null,
         id,
       ],
     );
@@ -395,7 +422,8 @@ router.delete("/:id", validarToken, async (req, res) => {
       RETURNING
         id,
         nombre,
-        activo
+        activo,
+        tipo
       `,
       [id],
     );

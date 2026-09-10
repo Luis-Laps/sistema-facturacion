@@ -292,38 +292,63 @@ function Dashboard() {
       return;
     }
 
-    const debeHaber =
-      Number(cajaAbierta.monto_inicial || 0) +
-      Number(cajaAbierta.efectivo || 0);
+    const efectivoActual = Number(cajaAbierta.efectivo || 0);
+
+    const tarjetaActual = Number(cajaAbierta.tarjeta || 0);
+
+    const transferenciaActual = Number(cajaAbierta.transferencia || 0);
+
+    const totalActual = efectivoActual + tarjetaActual + transferenciaActual;
+
+    const debeHaber = Number(cajaAbierta.monto_inicial || 0) + efectivoActual;
+
+    // ==========================================
+    // MODAL CERRAR CAJA
+    // ==========================================
 
     const { value, isConfirmed } = await Swal.fire({
       title: "Cerrar Caja",
 
       html: `
-          <div style="text-align:left">
+      <div style="text-align:left">
 
-            <div class="mb-2">
-              <strong>Monto inicial:</strong>
-              RD$ ${moneda(cajaAbierta.monto_inicial)}
-            </div>
+        <div class="mb-2">
+          <strong>Monto inicial:</strong>
+          RD$ ${moneda(cajaAbierta.monto_inicial)}
+        </div>
 
-            <div class="mb-2">
-              <strong>Ventas en efectivo:</strong>
-              RD$ ${moneda(cajaAbierta.efectivo)}
-            </div>
+        <div class="mb-2">
+          <strong>Ventas en efectivo:</strong>
+          RD$ ${moneda(efectivoActual)}
+        </div>
 
-            <hr>
+        <div class="mb-2">
+          <strong>Ventas con tarjeta:</strong>
+          RD$ ${moneda(tarjetaActual)}
+        </div>
 
-            <div>
-              <strong>Debe haber:</strong>
-            </div>
+        <div class="mb-2">
+          <strong>Ventas por transferencia:</strong>
+          RD$ ${moneda(transferenciaActual)}
+        </div>
 
-            <h3 style="color:#198754">
-              RD$ ${moneda(debeHaber)}
-            </h3>
+        <div class="mb-2">
+          <strong>Ventas totales:</strong>
+          RD$ ${moneda(totalActual)}
+        </div>
 
-          </div>
-        `,
+        <hr>
+
+        <div>
+          <strong>Debe haber en efectivo:</strong>
+        </div>
+
+        <h3 style="color:#198754">
+          RD$ ${moneda(debeHaber)}
+        </h3>
+
+      </div>
+    `,
 
       input: "number",
 
@@ -360,67 +385,120 @@ function Dashboard() {
     }
 
     try {
+      // ==========================================
+      // CERRAR EN BACKEND
+      // ==========================================
+
       const response = await api.post("/cajas/cerrar", {
         dinero_contado: Number(value),
       });
 
       await verificarCaja();
 
-      Swal.fire({
+      const datosCierre = response.data;
+
+      // ==========================================
+      // MODAL FINAL
+      // ==========================================
+
+      const resultado = await Swal.fire({
         icon: "success",
+
         title: "Caja cerrada",
 
         html: `
-          <div style="text-align:left">
+        <div style="text-align:left">
 
-            <p>
-              <strong>Debe haber:</strong>
-              RD$ ${moneda(response.data.debeHaber)}
-            </p>
+          <p>
+            <strong>Debe haber:</strong>
+            RD$ ${moneda(datosCierre.debeHaber)}
+          </p>
 
-            <p>
-              <strong>Diferencia:</strong>
-              RD$ ${moneda(response.data.diferencia)}
-            </p>
+          <p>
+            <strong>Diferencia:</strong>
+            RD$ ${moneda(datosCierre.diferencia)}
+          </p>
 
-            <hr>
+          <hr>
 
-            <p>
-              <strong>Facturas:</strong>
-              ${response.data.cantidadFacturas || 0}
-            </p>
+          <p>
+            <strong>Facturas:</strong>
+            ${datosCierre.cantidadFacturas || 0}
+          </p>
 
-            <p>
-              <strong>Propinas aplicadas:</strong>
-              ${response.data.cantidadPropinasAplicadas || 0}
-            </p>
+          <p>
+            <strong>Clientes atendidos:</strong>
+            ${datosCierre.clientesAtendidos || 0}
+          </p>
 
-            <p>
-              <strong>Total propinas:</strong>
-              RD$ ${moneda(response.data.totalPropinas)}
-            </p>
+          <p>
+            <strong>Productos vendidos:</strong>
+            ${datosCierre.cantidadProductos || 0}
+          </p>
 
-            <p>
-              <strong>Productos vendidos:</strong>
-              ${response.data.cantidadProductos || 0}
-            </p>
+          <hr>
 
-            <p>
-              <strong>Total vendido:</strong>
-              RD$ ${moneda(response.data.totalVentas)}
-            </p>
+          <p>
+            <strong>Efectivo:</strong>
+            RD$ ${moneda(datosCierre.totalEfectivo)}
+          </p>
 
-          </div>
-        `,
+          <p>
+            <strong>Tarjeta:</strong>
+            RD$ ${moneda(datosCierre.totalTarjeta)}
+          </p>
+
+          <p>
+            <strong>Transferencia:</strong>
+            RD$ ${moneda(datosCierre.totalTransferencia)}
+          </p>
+
+          <p>
+            <strong>Ventas totales:</strong>
+            RD$ ${moneda(datosCierre.totalVentas)}
+          </p>
+
+          <hr>
+
+          <p>
+            <strong>Propinas aplicadas:</strong>
+            ${datosCierre.cantidadPropinasAplicadas || 0}
+          </p>
+
+          <p>
+            <strong>Total propinas:</strong>
+            RD$ ${moneda(datosCierre.totalPropinas)}
+          </p>
+
+        </div>
+      `,
+
+        showCancelButton: true,
+
+        confirmButtonText: "🖨️ Imprimir reporte",
+
+        cancelButtonText: "Cerrar",
+
+        confirmButtonColor: "#198754",
+
+        reverseButtons: true,
       });
+
+      // ==========================================
+      // IMPRIMIR CIERRE
+      // ==========================================
+
+      if (resultado.isConfirmed && datosCierre.cajaId) {
+        navigate(`/imprimir-cierre-caja/${datosCierre.cajaId}`);
+      }
     } catch (error) {
       console.error("Error cerrando caja:", error);
 
-      Swal.fire(
-        "Error",
-        error.response?.data?.mensaje || "No fue posible cerrar la caja.",
-        "error",
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.mensaje || "No fue posible cerrar la caja.",
+      });
     }
   };
 

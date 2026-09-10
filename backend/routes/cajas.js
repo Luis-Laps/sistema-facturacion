@@ -374,9 +374,19 @@ router.post("/abrir", validarToken, async (req, res) => {
 // CERRAR CAJA
 // =======================================
 
+// =======================================
+// CERRAR CAJA
+// =======================================
+
 router.post("/cerrar", validarToken, async (req, res) => {
   try {
     const { dinero_contado } = req.body;
+
+    if (dinero_contado === undefined || Number(dinero_contado) < 0) {
+      return res.status(400).json({
+        mensaje: "El dinero contado no es válido.",
+      });
+    }
 
     const caja = await pool.query(
       `
@@ -399,14 +409,43 @@ router.post("/cerrar", validarToken, async (req, res) => {
     const cajaActual = caja.rows[0];
 
     // ===========================================
-    // TOTAL VENTAS, FACTURAS Y PROPINAS
+    // RESUMEN DE FACTURAS
     // ===========================================
 
     const ventasResult = await pool.query(
       `
       SELECT
-
         COUNT(*) AS cantidad_facturas,
+
+        COALESCE(
+          SUM(total),
+          0
+        ) AS total_ventas,
+
+        COALESCE(
+          SUM(total) FILTER (
+            WHERE forma_pago = 'EFECTIVO'
+          ),
+          0
+        ) AS total_efectivo,
+
+        COALESCE(
+          SUM(total) FILTER (
+            WHERE forma_pago = 'TARJETA'
+          ),
+          0
+        ) AS total_tarjeta,
+
+        COALESCE(
+          SUM(total) FILTER (
+            WHERE forma_pago = 'TRANSFERENCIA'
+          ),
+          0
+        ) AS total_transferencia,
+
+        COUNT(DISTINCT cliente_id) FILTER (
+          WHERE cliente_id IS NOT NULL
+        ) AS clientes_atendidos,
 
         COUNT(*) FILTER (
           WHERE propina_aplicada = TRUE
@@ -421,12 +460,7 @@ router.post("/cerrar", validarToken, async (req, res) => {
             END
           ),
           0
-        ) AS total_propinas,
-
-        COALESCE(
-          SUM(total),
-          0
-        ) AS total_ventas
+        ) AS total_propinas
 
       FROM facturas
 
@@ -436,24 +470,37 @@ router.post("/cerrar", validarToken, async (req, res) => {
       [cajaActual.id, req.usuario.empresa_id],
     );
 
-    const totalVentas = Number(ventasResult.rows[0].total_ventas);
+    const totalVentas = Number(ventasResult.rows[0].total_ventas || 0);
 
-    const cantidadFacturas = Number(ventasResult.rows[0].cantidad_facturas);
-
-    const cantidadPropinasAplicadas = Number(
-      ventasResult.rows[0].cantidad_propinas_aplicadas,
+    const cantidadFacturas = Number(
+      ventasResult.rows[0].cantidad_facturas || 0,
     );
 
-    const totalPropinas = Number(ventasResult.rows[0].total_propinas);
+    const totalEfectivo = Number(ventasResult.rows[0].total_efectivo || 0);
+
+    const totalTarjeta = Number(ventasResult.rows[0].total_tarjeta || 0);
+
+    const totalTransferencia = Number(
+      ventasResult.rows[0].total_transferencia || 0,
+    );
+
+    const clientesAtendidos = Number(
+      ventasResult.rows[0].clientes_atendidos || 0,
+    );
+
+    const cantidadPropinasAplicadas = Number(
+      ventasResult.rows[0].cantidad_propinas_aplicadas || 0,
+    );
+
+    const totalPropinas = Number(ventasResult.rows[0].total_propinas || 0);
 
     // ===========================================
-    // PRODUCTOS VENDIDOS Y COSTOS
+    // PRODUCTOS Y COSTOS
     // ===========================================
 
     const detalleResult = await pool.query(
       `
       SELECT
-
         COALESCE(
           SUM(fd.cantidad),
           0
@@ -462,10 +509,9 @@ router.post("/cerrar", validarToken, async (req, res) => {
         COALESCE(
           SUM(
             CASE
-              WHEN fd.es_servicio = TRUE THEN
-                COALESCE(fd.costo_manual, 0) * fd.cantidad
-              ELSE
-                COALESCE(p.costo_compra, 0) * fd.cantidad
+              WHEN fd.es_servicio = TRUE
+              THEN COALESCE(fd.costo_manual, 0) * fd.cantidad
+              ELSE COALESCE(p.costo_compra, 0) * fd.cantidad
             END
           ),
           0
@@ -487,20 +533,25 @@ router.post("/cerrar", validarToken, async (req, res) => {
       [cajaActual.id, req.usuario.empresa_id],
     );
 
-    const cantidadProductos = Number(detalleResult.rows[0].cantidad_productos);
+    const cantidadProductos = Number(
+      detalleResult.rows[0].cantidad_productos || 0,
+    );
 
-    const totalCostos = Number(detalleResult.rows[0].total_costos);
+    const totalCostos = Number(detalleResult.rows[0].total_costos || 0);
 
     const ganancia = totalVentas - totalCostos;
 
     // ===========================================
-    // CIERRE DE CAJA
+    // EFECTIVO ESPERADO
     // ===========================================
 
-    const debeHaber =
-      Number(cajaActual.monto_inicial) + Number(cajaActual.efectivo);
+    const debeHaber = Number(cajaActual.monto_inicial || 0) + totalEfectivo;
 
     const diferencia = Number(dinero_contado) - debeHaber;
+
+    // ===========================================
+    // CERRAR CAJA
+    // ===========================================
 
     await pool.query(
       `
@@ -508,21 +559,27 @@ router.post("/cerrar", validarToken, async (req, res) => {
       SET
         dinero_contado = $1,
         diferencia = $2,
+        efectivo = $3,
+        tarjeta = $4,
+        transferencia = $5,
         fecha_cierre = CURRENT_TIMESTAMP AT TIME ZONE 'America/Santo_Domingo',
         estado = 'CERRADA',
-        total_ventas = $3,
-        total_costos = $4,
-        ganancia = $5,
-        cantidad_facturas = $6,
-        cantidad_productos = $7
+        total_ventas = $6,
+        total_costos = $7,
+        ganancia = $8,
+        cantidad_facturas = $9,
+        cantidad_productos = $10
 
-      WHERE id = $8
-      AND usuario_id = $9
-      AND empresa_id = $10
+      WHERE id = $11
+      AND usuario_id = $12
+      AND empresa_id = $13
       `,
       [
-        dinero_contado,
+        Number(dinero_contado),
         diferencia,
+        totalEfectivo,
+        totalTarjeta,
+        totalTransferencia,
         totalVentas,
         totalCostos,
         ganancia,
@@ -534,23 +591,236 @@ router.post("/cerrar", validarToken, async (req, res) => {
       ],
     );
 
+    // ===========================================
+    // RESPUESTA
+    // ===========================================
+
     res.json({
       mensaje: "Caja cerrada correctamente.",
+
+      cajaId: cajaActual.id,
+
+      montoInicial: Number(cajaActual.monto_inicial || 0),
+
       debeHaber,
+
+      dineroContado: Number(dinero_contado),
+
       diferencia,
+
       totalVentas,
+
       totalCostos,
+
       ganancia,
+
       cantidadFacturas,
-      cantidadPropinasAplicadas,
-      totalPropinas,
+
       cantidadProductos,
+
+      clientesAtendidos,
+
+      cantidadPropinasAplicadas,
+
+      totalPropinas,
+
+      totalEfectivo,
+
+      totalTarjeta,
+
+      totalTransferencia,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error cerrando caja:", error);
 
     res.status(500).json({
       mensaje: "Error al cerrar la caja.",
+    });
+  }
+});
+
+// =======================================
+// REPORTE DE CIERRE PARA IMPRESIÓN 80 MM
+// INDEPENDIENTE DEL MÓDULO DE REPORTES
+// =======================================
+
+router.get("/cierre-ticket/:id", validarToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // ===========================================
+    // DATOS DE LA CAJA
+    // ===========================================
+
+    const cajaResult = await pool.query(
+      `
+        SELECT
+          c.id,
+          c.fecha_apertura,
+          c.fecha_cierre,
+          c.monto_inicial,
+          c.efectivo,
+          c.tarjeta,
+          c.transferencia,
+          c.dinero_contado,
+          c.diferencia,
+          c.total_ventas,
+          c.total_costos,
+          c.ganancia,
+          c.cantidad_facturas,
+          c.cantidad_productos,
+          c.estado,
+
+          e.nombre AS empresa,
+          e.logo_url,
+          e.rnc,
+          e.telefono,
+          e.direccion,
+          e.correo,
+
+          u.nombre AS usuario_nombre
+
+        FROM cajas c
+
+        INNER JOIN empresas e
+          ON e.id = c.empresa_id
+
+        LEFT JOIN usuarios u
+          ON u.id = c.usuario_id
+          AND u.empresa_id = c.empresa_id
+
+        WHERE c.id = $1
+        AND c.usuario_id = $2
+        AND c.empresa_id = $3
+        `,
+      [id, req.usuario.id, req.usuario.empresa_id],
+    );
+
+    if (cajaResult.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Cierre de caja no encontrado.",
+      });
+    }
+
+    const caja = cajaResult.rows[0];
+
+    // ===========================================
+    // RESUMEN DE FACTURAS
+    // ===========================================
+
+    const resumenResult = await pool.query(
+      `
+        SELECT
+
+          COUNT(*) AS cantidad_facturas,
+
+          COALESCE(
+            SUM(total),
+            0
+          ) AS total_ventas,
+
+          COALESCE(
+            SUM(total) FILTER (
+              WHERE forma_pago = 'EFECTIVO'
+            ),
+            0
+          ) AS total_efectivo,
+
+          COALESCE(
+            SUM(total) FILTER (
+              WHERE forma_pago = 'TARJETA'
+            ),
+            0
+          ) AS total_tarjeta,
+
+          COALESCE(
+            SUM(total) FILTER (
+              WHERE forma_pago = 'TRANSFERENCIA'
+            ),
+            0
+          ) AS total_transferencia,
+
+          COUNT(DISTINCT cliente_id) FILTER (
+            WHERE cliente_id IS NOT NULL
+          ) AS clientes_atendidos,
+
+          COUNT(*) FILTER (
+            WHERE propina_aplicada = TRUE
+          ) AS cantidad_propinas,
+
+          COALESCE(
+            SUM(
+              CASE
+                WHEN propina_aplicada = TRUE
+                THEN COALESCE(propina, 0)
+                ELSE 0
+              END
+            ),
+            0
+          ) AS total_propinas
+
+        FROM facturas
+
+        WHERE caja_id = $1
+        AND empresa_id = $2
+        `,
+      [id, req.usuario.empresa_id],
+    );
+
+    // ===========================================
+    // PRODUCTOS VENDIDOS
+    // ===========================================
+
+    const productosResult = await pool.query(
+      `
+        SELECT
+          COALESCE(
+            SUM(fd.cantidad),
+            0
+          ) AS cantidad_productos
+
+        FROM factura_detalle fd
+
+        INNER JOIN facturas f
+          ON f.id = fd.factura_id
+
+        WHERE f.caja_id = $1
+        AND f.empresa_id = $2
+        `,
+      [id, req.usuario.empresa_id],
+    );
+
+    const resumen = resumenResult.rows[0];
+    const productos = productosResult.rows[0];
+
+    res.json({
+      caja,
+
+      resumen: {
+        cantidadFacturas: Number(resumen.cantidad_facturas || 0),
+
+        totalVentas: Number(resumen.total_ventas || 0),
+
+        totalEfectivo: Number(resumen.total_efectivo || 0),
+
+        totalTarjeta: Number(resumen.total_tarjeta || 0),
+
+        totalTransferencia: Number(resumen.total_transferencia || 0),
+
+        clientesAtendidos: Number(resumen.clientes_atendidos || 0),
+
+        cantidadPropinas: Number(resumen.cantidad_propinas || 0),
+
+        totalPropinas: Number(resumen.total_propinas || 0),
+
+        cantidadProductos: Number(productos.cantidad_productos || 0),
+      },
+    });
+  } catch (error) {
+    console.error("Error obteniendo cierre para impresión:", error);
+
+    res.status(500).json({
+      mensaje: "Error al obtener el reporte de cierre.",
     });
   }
 });

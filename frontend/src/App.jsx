@@ -16,6 +16,21 @@ import Cotizacion from "./pages/Cotizacion";
 import ControlOrden from "./pages/ControlOrden";
 import MesaOrden from "./pages/MesaOrden";
 import ImprimirCuentaPendiente from "./pages/ImprimirCuentaPendiente";
+import ImprimirCierreCaja from "./pages/ImprimirCierreCaja";
+
+// ==========================================
+// FERRETERÍA
+// ==========================================
+
+import FerreteriaNuevaFactura from "./pages/FerreteriaNuevaFactura";
+import FerreteriaFacturasAbiertas from "./pages/FerreteriaFacturasAbiertas";
+import FerreteriaFacturaAbierta from "./pages/FerreteriaFacturaAbierta";
+import Proveedores from "./pages/Proveedores";
+
+// ==========================================
+// COMPONENTES
+// ==========================================
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
 
@@ -23,10 +38,16 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* LOGIN */}
+        {/* ==========================================
+            LOGIN
+        ========================================== */}
+
         <Route path="/" element={<Login />} />
 
-        {/* SISTEMA */}
+        {/* ==========================================
+            SISTEMA
+        ========================================== */}
+
         <Route
           path="*"
           element={
@@ -35,13 +56,29 @@ function App() {
 
               <main className="app-content">
                 <Routes>
+                  {/* ==================================
+                      PRINCIPAL
+                  ================================== */}
+
                   <Route path="/dashboard" element={<Dashboard />} />
+
+                  {/* ==================================
+                      PRODUCTOS
+                  ================================== */}
 
                   <Route path="/productos" element={<Productos />} />
 
                   <Route path="/categorias" element={<Categorias />} />
 
+                  {/* ==================================
+                      CLIENTES
+                  ================================== */}
+
                   <Route path="/clientes" element={<Clientes />} />
+
+                  {/* ==================================
+                      FACTURACIÓN ESTÁNDAR
+                  ================================== */}
 
                   <Route path="/facturas" element={<Facturas />} />
 
@@ -50,7 +87,36 @@ function App() {
                     element={<HistorialFacturas />}
                   />
 
+                  <Route path="/cotizacion" element={<Cotizacion />} />
+
+                  {/* ==================================
+                      FERRETERÍA
+                  ================================== */}
+
+                  <Route
+                    path="/ferreteria/nueva-factura"
+                    element={<FerreteriaNuevaFactura />}
+                  />
+
+                  <Route
+                    path="/ferreteria/facturas-abiertas"
+                    element={<FerreteriaFacturasAbiertas />}
+                  />
+
+                  <Route
+                    path="/ferreteria/facturas-abiertas/:id"
+                    element={<FerreteriaFacturaAbierta />}
+                  />
+
+                  {/* ==================================
+                      REPORTES
+                  ================================== */}
+
                   <Route path="/reportes-caja" element={<ReportesCaja />} />
+
+                  {/* ==================================
+                      EMPRESAS
+                  ================================== */}
 
                   <Route
                     path="/empresas"
@@ -61,6 +127,10 @@ function App() {
                     }
                   />
 
+                  {/* ==================================
+                      USUARIOS
+                  ================================== */}
+
                   <Route
                     path="/usuarios"
                     element={
@@ -69,6 +139,10 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* ==================================
+                      CONFIGURACIÓN
+                  ================================== */}
 
                   <Route
                     path="/configuracion"
@@ -79,9 +153,10 @@ function App() {
                     }
                   />
 
-                  <Route path="/cotizacion" element={<Cotizacion />} />
+                  {/* ==================================
+                      CONTROL DE ORDEN
+                  ================================== */}
 
-                  {/* CONTROL DE ORDEN */}
                   <Route path="/control-orden" element={<ControlOrden />} />
 
                   <Route
@@ -89,17 +164,28 @@ function App() {
                     element={<MesaOrden />}
                   />
 
-                  {/* IMPRESIÓN DE FACTURA */}
+                  {/* ==================================
+                      IMPRESIÓN DE FACTURA
+                  ================================== */}
+
                   <Route
                     path="/imprimir-factura/:id"
                     element={<ImprimirFacturaTicket />}
                   />
+                  <Route
+                    path="/imprimir-cierre-caja/:id"
+                    element={<ImprimirCierreCaja />}
+                  />
 
-                  {/* IMPRESIÓN DE CUENTA PENDIENTE */}
+                  {/* ==================================
+                      IMPRESIÓN DE CUENTA PENDIENTE
+                  ================================== */}
+
                   <Route
                     path="/imprimir-cuenta-pendiente/:id"
                     element={<ImprimirCuentaPendiente />}
                   />
+                  <Route path="/proveedores" element={<Proveedores />} />
                 </Routes>
               </main>
             </div>

@@ -1,145 +1,309 @@
-.ticket {
-  width: 80mm;
-  margin: 0 auto 20px;
-  padding: 5mm;
-  background: #fff;
-  color: #000;
+/* =========================================================
+   TICKET DE FACTURA - 80 MM
+   ========================================================= */
+
+.ticket-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  box-sizing: border-box;
-  page-break-inside: avoid;
-  break-inside: avoid;
 }
 
-.logo {
-  width: 110px;
-  display: block;
-  margin: 0 auto 10px;
+.ticket-toolbar {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 24px;
+}
+
+.ticket-print-button {
+  border: 0;
+  border-radius: 6px;
+  background: #198754;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  cursor: pointer;
+}
+
+.ticket-page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0 0 30px;
+  background: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #111;
+}
+
+.ticket {
+  width: 72mm;
+  max-width: calc(100vw - 20px);
+  margin: 0 auto;
+  padding: 2mm 0;
+  background: #fff;
+  color: #111;
+  font-size: 11px;
+  line-height: 1.28;
+  box-sizing: border-box;
 }
 
 .empresa {
   text-align: center;
 }
 
-.empresa h2 {
-  margin: 5px 0;
-  font-size: 18px;
-  font-weight: bold;
+.logo {
+  display: block;
+  width: auto;
+  max-width: 62mm;
+  max-height: 30mm;
+  object-fit: contain;
+  margin: 0 auto 7px;
 }
 
-.empresa h3 {
-  margin: 8px 0;
-  font-size: 16px;
-  font-weight: bold;
+.empresa h2 {
+  margin: 0 0 5px;
+  font-size: 18px;
+  line-height: 1.15;
+  font-weight: 700;
+  word-break: break-word;
 }
 
 .empresa p {
-  margin: 2px 0;
+  margin: 1px 0;
   font-size: 11px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.ticket-separator {
+  width: 100%;
+  border-top: 1px dashed #777;
+  margin: 8px 0;
+}
+
+.ticket-heading {
+  text-align: center;
+}
+
+.ticket-heading h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 700;
 }
 
 .cajero {
-  margin-top: 5px;
-  font-size: 12px;
+  margin: 0;
+  font-size: 10.5px;
 }
 
 .info-ticket {
-  margin: 12px 0;
-  font-size: 12px;
+  margin: 0;
 }
 
 .fila {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
   margin: 4px 0;
 }
 
-.fila span:first-child {
-  font-weight: bold;
+.fila > span:last-child,
+.fila > strong:last-child {
+  text-align: right;
+  word-break: break-word;
+}
+
+.fila > span:first-child {
+  font-weight: 600;
+}
+
+.ticket-items {
+  width: 100%;
 }
 
 .item {
-  margin-bottom: 8px;
+  margin: 0 0 7px;
+  padding: 0 0 6px;
+  border-bottom: 1px dotted #aaa;
+}
+
+.item:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .producto {
-  font-weight: bold;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
   word-break: break-word;
-  margin-bottom: 3px;
 }
 
 .detalle-producto {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 10.5px;
+}
+
+.detalle-producto span:last-child {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.descuento-linea {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.resumen-ticket {
+  margin-top: 0;
+}
+
+.fila-descuento {
+  color: #dc3545;
 }
 
 .total {
   text-align: center;
-  margin: 15px 0;
+  margin: 10px 0 8px;
 }
 
 .titulo-total {
-  font-size: 15px;
-  font-weight: bold;
-  letter-spacing: 1px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
 }
 
 .monto-total {
   font-size: 28px;
-  font-weight: bold;
-  margin-top: 5px;
+  line-height: 1;
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.forma-pago {
+  margin: 0;
 }
 
 .footer {
   text-align: center;
-  font-size: 12px;
-  margin-top: 15px;
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 
-hr {
-  border: none;
-  border-top: 1px dashed #000;
-  margin: 8px 0;
+.footer-empresa {
+  margin-top: 8px;
 }
 
-/* Separador entre ambas copias */
-
-.separador-ticket {
-  width: 80mm;
-  margin: 10px auto;
-  border-top: 2px dashed #999;
-}
-
-/* -------------------- */
-
-@page {
-  size: 80mm auto;
-  margin: 0;
-}
+/* =========================================================
+   IMPRESIÓN
+   ========================================================= */
 
 @media print {
-  html,
-  body {
+  @page {
+    size: 80mm auto;
     margin: 0;
-    padding: 0;
-    background: white;
+  }
+
+  html,
+  body,
+  #root {
+    width: 80mm !important;
+    min-width: 80mm !important;
+    max-width: 80mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  body.ticket-printing {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.ticket-printing * {
+    box-sizing: border-box;
+  }
+
+  /* Eliminar elementos de navegación de la impresión */
+  body.ticket-printing .sidebar,
+  body.ticket-printing .mobile-topbar,
+  body.ticket-printing .sidebar-overlay,
+  body.ticket-printing .no-print {
+    display: none !important;
+  }
+
+  /* Neutralizar cualquier layout general que pueda desplazar el ticket */
+  body.ticket-printing main,
+  body.ticket-printing .ticket-page {
+    margin-left: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  .ticket-toolbar {
+    display: none !important;
+  }
+
+  .ticket-page {
+    width: 80mm !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
   }
 
   .ticket {
-    width: 80mm;
-    margin: 0 auto 10mm;
-    padding: 4mm;
-    page-break-inside: avoid;
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 0 1mm !important;
+    font-size: 11px !important;
+  }
+
+  .logo {
+    max-width: 62mm !important;
+    max-height: 30mm !important;
+    margin-bottom: 6px !important;
+  }
+
+  .empresa h2 {
+    font-size: 18px !important;
+  }
+
+  .ticket-separator {
+    margin: 7px 0 !important;
+  }
+
+  .item {
+    margin-bottom: 6px !important;
+    padding-bottom: 5px !important;
     break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  .separador-ticket {
-    margin: 5mm auto;
-    border-top: 2px dashed #999;
+  .total {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  .no-print {
-    display: none !important;
+  .footer {
+    padding-bottom: 1mm !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

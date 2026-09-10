@@ -26,6 +26,10 @@ function Empresas() {
     logo_url: "",
     color_principal: "#198754",
 
+    //Tipo de empresa
+
+    tipo: "ESTANDAR",
+
     // Características
     propina_ley: false,
     itbis_ley: false,
@@ -89,6 +93,9 @@ function Empresas() {
       logo_url: "",
       color_principal: "#198754",
 
+      // Tipo de empresa
+      tipo: "ESTANDAR",
+
       propina_ley: false,
       itbis_ley: false,
 
@@ -115,6 +122,9 @@ function Empresas() {
       correo: empresa.correo || "",
       logo_url: empresa.logo_url || "",
       color_principal: empresa.color_principal || "#198754",
+
+      // Tipo de empresa
+      tipo: empresa.tipo || "ESTANDAR",
 
       propina_ley: empresa.propina_ley === true,
       itbis_ley: empresa.itbis_ley === true,
@@ -187,6 +197,7 @@ function Empresas() {
           correo: form.correo,
           logo_url: form.logo_url,
           color_principal: form.color_principal,
+          tipo: form.tipo,
           propina_ley: form.propina_ley,
           itbis_ley: form.itbis_ley,
         });
@@ -283,6 +294,7 @@ function Empresas() {
         correo: empresa.correo,
         logo_url: empresa.logo_url,
         color_principal: empresa.color_principal,
+        tipo: empresa.tipo || "ESTANDAR",
         propina_ley: empresa.propina_ley === true,
         itbis_ley: empresa.itbis_ley === true,
         activo: true,
@@ -568,6 +580,27 @@ function Empresas() {
                         value={form.color_principal}
                         onChange={cambiarCampo}
                       />
+                    </div>
+
+                    {/* TIPO DE EMPRESA */}
+
+                    <div className="col-md-12 mb-3">
+                      <label className="form-label">Tipo de empresa *</label>
+
+                      <select
+                        className="form-select"
+                        name="tipo"
+                        value={form.tipo}
+                        onChange={cambiarCampo}
+                        disabled={guardando}
+                      >
+                        <option value="ESTANDAR">Empresa estándar</option>
+                        <option value="FERRETERIA">Ferretería</option>
+                      </select>
+
+                      <div className="form-text">
+                        Define los módulos y el menú que tendrá esta empresa.
+                      </div>
                     </div>
                   </div>
 

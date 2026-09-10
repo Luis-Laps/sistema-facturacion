@@ -14,6 +14,9 @@ const categoriasRoutes = require("./routes/categorias");
 const cajasRoutes = require("./routes/cajas");
 const empresasRoutes = require("./routes/empresas");
 const controlOrdenToutes = require("./routes/controlOrden");
+const ferreteriaRoutes = require("./routes/ferreteria");
+const ferreteriaAbiertasRoutes = require("./routes/ferreteriaAbiertas");
+const proveedoresRoutes = require("./routes/proveedores");
 
 const app = express();
 
@@ -31,6 +34,9 @@ app.use("/api/categorias", categoriasRoutes);
 app.use("/api/cajas", cajasRoutes);
 app.use("/api/empresas", empresasRoutes);
 app.use("/api/control-orden", controlOrdenToutes);
+app.use("/api/ferreteria", ferreteriaRoutes);
+app.use("/api/ferreteria-abiertas", ferreteriaAbiertasRoutes);
+app.use("/api/proveedores", proveedoresRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Sistema de Facturación");

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
 import api from "../services/api";
-import Navbar from "../components/Navbar";
 
 const crearProductoVacio = () => ({
   codigo: "",
@@ -15,6 +14,7 @@ const crearProductoVacio = () => ({
   precio_venta: 0,
   stock: 0,
   tipo: "PRODUCTO",
+  proveedor_id: "",
 });
 
 function Productos() {
@@ -29,6 +29,10 @@ function Productos() {
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
 
+  const [proveedores, setProveedores] = useState([]);
+
+  const [empresa, setEmpresa] = useState(null);
+
   const [inversion, setInversion] = useState(0);
   const [gananciaProyectada, setGananciaProyectada] = useState(0);
   const [valorTotal, setValorTotal] = useState(0);
@@ -36,10 +40,44 @@ function Productos() {
   const [busqueda, setBusqueda] = useState("");
 
   const [mostrarModal, setMostrarModal] = useState(false);
+
   const [editando, setEditando] = useState(false);
+
   const [editandoId, setEditandoId] = useState(null);
 
   const [producto, setProducto] = useState(crearProductoVacio());
+
+  // ==========================================
+  // MODAL PROVEEDOR
+  // ==========================================
+
+  const [mostrarModalProveedor, setMostrarModalProveedor] = useState(false);
+
+  const [guardandoProveedor, setGuardandoProveedor] = useState(false);
+
+  const [nuevoProveedor, setNuevoProveedor] = useState({
+    nombre: "",
+    rnc: "",
+    telefono: "",
+    correo: "",
+    direccion: "",
+    contacto: "",
+    notas: "",
+  });
+
+  // ==========================================
+  // CARGAR EMPRESA
+  // ==========================================
+
+  const cargarEmpresa = async () => {
+    try {
+      const response = await api.get("/configuracion");
+
+      setEmpresa(response.data);
+    } catch (error) {
+      console.error("Error al cargar configuración:", error);
+    }
+  };
 
   // ==========================================
   // CARGAR PRODUCTOS
@@ -47,14 +85,23 @@ function Productos() {
 
   const cargarProductos = async () => {
     try {
-      const response = await api.get(`/productos?page=${page}&limit=${limite}`);
+      const response = await api.get(
+        `/productos?page=${page}&limit=${limite}&buscar=${encodeURIComponent(
+          busqueda,
+        )}`,
+      );
 
-      setProductos(response.data.data);
-      setTotalPages(response.data.totalPages);
-      setTotalProductos(response.data.total);
-      setInversion(response.data.inversion);
-      setGananciaProyectada(response.data.gananciaProyectada);
-      setValorTotal(response.data.valorTotal);
+      setProductos(response.data.data || []);
+
+      setTotalPages(response.data.totalPages || 1);
+
+      setTotalProductos(response.data.total || 0);
+
+      setInversion(response.data.inversion || 0);
+
+      setGananciaProyectada(response.data.gananciaProyectada || 0);
+
+      setValorTotal(response.data.valorTotal || 0);
     } catch (error) {
       console.error(error);
     }
@@ -75,7 +122,68 @@ function Productos() {
   };
 
   // ==========================================
-  // INPUTS
+  // CARGAR PROVEEDORES
+  // ==========================================
+
+  const cargarProveedores = async () => {
+    if (empresa?.tipo !== "FERRETERIA") {
+      setProveedores([]);
+      return;
+    }
+
+    try {
+      const response = await api.get("/proveedores");
+
+      setProveedores(response.data || []);
+    } catch (error) {
+      console.error("Error al cargar proveedores:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error.response?.data?.mensaje ||
+          "No se pudieron cargar los proveedores.",
+      });
+    }
+  };
+
+  // ==========================================
+  // CARGA INICIAL
+  // ==========================================
+
+  useEffect(() => {
+    cargarEmpresa();
+    cargarCategorias();
+  }, []);
+
+  useEffect(() => {
+    cargarProductos();
+  }, [page]);
+
+  useEffect(() => {
+    if (empresa?.tipo === "FERRETERIA") {
+      cargarProveedores();
+    } else {
+      setProveedores([]);
+    }
+  }, [empresa?.tipo]);
+
+  // ==========================================
+  // BUSQUEDA
+  // ==========================================
+
+  useEffect(() => {
+    const tiempo = setTimeout(() => {
+      setPage(1);
+      cargarProductos();
+    }, 300);
+
+    return () => clearTimeout(tiempo);
+  }, [busqueda]);
+
+  // ==========================================
+  // INPUTS PRODUCTO
   // ==========================================
 
   const handleChange = (e) => {
@@ -87,6 +195,7 @@ function Productos() {
     };
 
     const costo = Number(nuevo.costo_compra) || 0;
+
     const porcentaje = Number(nuevo.porcentaje_ganancia) || 0;
 
     if (name === "costo_compra" || name === "porcentaje_ganancia") {
@@ -112,8 +221,10 @@ function Productos() {
 
   const nuevoProducto = () => {
     setProducto(crearProductoVacio());
+
     setEditando(false);
     setEditandoId(null);
+
     setMostrarModal(true);
   };
 
@@ -129,19 +240,35 @@ function Productos() {
         !producto.categoria_id
       ) {
         Swal.fire("Atención", "Complete los campos obligatorios.", "warning");
+
         return;
       }
 
+      const esFerreteria = empresa?.tipo === "FERRETERIA";
+
+      const esProducto = producto.tipo === "PRODUCTO";
+
       const datos = {
-        codigo: producto.codigo,
+        codigo: producto.codigo || null,
+
         nombre: producto.nombre,
+
         categoria_id: Number(producto.categoria_id),
+
         descripcion: producto.descripcion,
+
         costo_compra: Number(producto.costo_compra),
+
         precio_venta: Number(producto.precio_venta),
-        stock: producto.tipo === "PRODUCTO" ? Number(producto.stock) : 0,
+
+        stock: esProducto ? Number(producto.stock) : 0,
 
         tipo: producto.tipo,
+
+        proveedor_id:
+          esFerreteria && esProducto && producto.proveedor_id
+            ? Number(producto.proveedor_id)
+            : null,
       };
 
       if (editando) {
@@ -166,8 +293,13 @@ function Productos() {
 
       setMostrarModal(false);
 
-      cargarProductos();
-      cargarCategorias();
+      await cargarProductos();
+
+      await cargarCategorias();
+
+      if (empresa?.tipo === "FERRETERIA") {
+        await cargarProveedores();
+      }
     } catch (error) {
       console.error(error);
 
@@ -185,27 +317,40 @@ function Productos() {
 
   const editarProducto = (item) => {
     const porcentaje =
-      item.costo_compra > 0
+      Number(item.costo_compra) > 0
         ? (
-            ((item.precio_venta - item.costo_compra) / item.costo_compra) *
+            ((Number(item.precio_venta) - Number(item.costo_compra)) /
+              Number(item.costo_compra)) *
             100
           ).toFixed(2)
         : 0;
 
     setProducto({
-      codigo: item.codigo,
-      nombre: item.nombre,
-      categoria_id: item.categoria_id,
+      codigo: item.codigo || "",
+
+      nombre: item.nombre || "",
+
+      categoria_id: item.categoria_id || "",
+
       descripcion: item.descripcion || "",
-      costo_compra: item.costo_compra,
-      precio_venta: item.precio_venta,
+
+      costo_compra: item.costo_compra || 0,
+
+      precio_venta: item.precio_venta || 0,
+
       porcentaje_ganancia: porcentaje,
-      stock: item.stock,
+
+      stock: item.stock || 0,
+
       tipo: item.tipo || "PRODUCTO",
+
+      proveedor_id: item.proveedor_id || "",
     });
 
     setEditando(true);
+
     setEditandoId(item.id);
+
     setMostrarModal(true);
   };
 
@@ -223,7 +368,9 @@ function Productos() {
       cancelButtonText: "Cancelar",
     });
 
-    if (!confirmar.isConfirmed) return;
+    if (!confirmar.isConfirmed) {
+      return;
+    }
 
     try {
       await api.delete(`/productos/${id}`);
@@ -244,7 +391,89 @@ function Productos() {
   };
 
   // ==========================================
-  // BUSCAR
+  // PROVEEDOR - INPUTS
+  // ==========================================
+
+  const handleChangeProveedor = (e) => {
+    const { name, value } = e.target;
+
+    setNuevoProveedor((anterior) => ({
+      ...anterior,
+      [name]: value,
+    }));
+  };
+
+  // ==========================================
+  // ABRIR MODAL PROVEEDOR
+  // ==========================================
+
+  const abrirModalProveedor = () => {
+    setNuevoProveedor({
+      nombre: "",
+      rnc: "",
+      telefono: "",
+      correo: "",
+      direccion: "",
+      contacto: "",
+      notas: "",
+    });
+
+    setMostrarModalProveedor(true);
+  };
+
+  // ==========================================
+  // GUARDAR PROVEEDOR
+  // ==========================================
+
+  const guardarNuevoProveedor = async () => {
+    if (!nuevoProveedor.nombre.trim()) {
+      Swal.fire(
+        "Atención",
+        "El nombre del proveedor es obligatorio.",
+        "warning",
+      );
+
+      return;
+    }
+
+    try {
+      setGuardandoProveedor(true);
+
+      const response = await api.post("/proveedores", nuevoProveedor);
+
+      const proveedorCreado = response.data;
+
+      await cargarProveedores();
+
+      setProducto((anterior) => ({
+        ...anterior,
+        proveedor_id: proveedorCreado.id,
+      }));
+
+      setMostrarModalProveedor(false);
+
+      Swal.fire({
+        icon: "success",
+        title: "Proveedor creado",
+        text: "El proveedor fue creado y seleccionado automáticamente.",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error(error);
+
+      Swal.fire(
+        "Error",
+        error.response?.data?.mensaje || "No se pudo crear el proveedor.",
+        "error",
+      );
+    } finally {
+      setGuardandoProveedor(false);
+    }
+  };
+
+  // ==========================================
+  // FILTRO VISUAL
   // ==========================================
 
   const productosFiltrados = productos.filter((p) => {
@@ -257,19 +486,8 @@ function Productos() {
     );
   });
 
-  // ==========================================
-  // CARGA INICIAL
-  // ==========================================
-
-  useEffect(() => {
-    cargarProductos();
-    cargarCategorias();
-  }, [page]);
-
   return (
     <>
-      <Navbar />
-
       <div className="container mt-4">
         {/* ==========================================
             ENCABEZADO
@@ -297,11 +515,10 @@ function Productos() {
         </div>
 
         {/* ==========================================
-    RESUMEN DEL INVENTARIO
-========================================== */}
+            RESUMEN INVENTARIO
+        ========================================== */}
 
         <div className="row g-3 mb-4">
-          {/* INVERSIÓN */}
           <div className="col-md-4">
             <div className="card shadow-sm border-0 h-100">
               <div className="card-body">
@@ -324,7 +541,6 @@ function Productos() {
             </div>
           </div>
 
-          {/* GANANCIA PROYECTADA */}
           <div className="col-md-4">
             <div className="card shadow-sm border-0 h-100">
               <div className="card-body">
@@ -347,7 +563,6 @@ function Productos() {
             </div>
           </div>
 
-          {/* VALOR TOTAL */}
           <div className="col-md-4">
             <div className="card shadow-sm border-0 h-100">
               <div className="card-body">
@@ -397,12 +612,21 @@ function Productos() {
               <thead className="table-dark">
                 <tr>
                   <th>Código</th>
+
                   <th>Producto</th>
+
                   <th>Categoría</th>
+
+                  {empresa?.tipo === "FERRETERIA" && <th>Proveedor</th>}
+
                   <th>Costo</th>
+
                   <th>Venta</th>
+
                   <th>Ganancia</th>
+
                   <th>Cantidad</th>
+
                   <th width="170">Acciones</th>
                 </tr>
               </thead>
@@ -410,7 +634,10 @@ function Productos() {
               <tbody>
                 {productosFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="text-center py-4">
+                    <td
+                      colSpan={empresa?.tipo === "FERRETERIA" ? 9 : 8}
+                      className="text-center py-4"
+                    >
                       No hay productos registrados.
                     </td>
                   </tr>
@@ -423,6 +650,10 @@ function Productos() {
                     <td>{item.nombre}</td>
 
                     <td>{item.categoria}</td>
+
+                    {empresa?.tipo === "FERRETERIA" && (
+                      <td>{item.proveedor_nombre || "Sin proveedor"}</td>
+                    )}
 
                     <td>RD$ {Number(item.costo_compra).toLocaleString()}</td>
 
@@ -469,7 +700,8 @@ function Productos() {
             {" - "}
             {Math.min(page * limite, totalProductos)}
             {" de "}
-            {totalProductos} productos
+            {totalProductos}
+            {" productos"}
           </small>
 
           <div>
@@ -521,9 +753,11 @@ function Productos() {
 
                 <div className="modal-body">
                   <div className="row">
+                    {/* CÓDIGO */}
+
                     {producto.tipo === "PRODUCTO" && (
                       <div className="col-md-4 mb-3">
-                        <label>Código</label>
+                        <label className="form-label">Código</label>
 
                         <input
                           className="form-control"
@@ -534,8 +768,16 @@ function Productos() {
                       </div>
                     )}
 
-                    <div className="col-md-8 mb-3">
-                      <label>Nombre</label>
+                    {/* NOMBRE */}
+
+                    <div
+                      className={
+                        producto.tipo === "PRODUCTO"
+                          ? "col-md-8 mb-3"
+                          : "col-md-12 mb-3"
+                      }
+                    >
+                      <label className="form-label">Nombre</label>
 
                       <input
                         className="form-control"
@@ -548,7 +790,7 @@ function Productos() {
                     {/* CATEGORÍA */}
 
                     <div className="col-md-6 mb-3">
-                      <label>Categoría</label>
+                      <label className="form-label">Categoría</label>
 
                       <select
                         className="form-select"
@@ -569,7 +811,7 @@ function Productos() {
                     {/* TIPO */}
 
                     <div className="col-md-6 mb-3">
-                      <label>Tipo</label>
+                      <label className="form-label">Tipo</label>
 
                       <select
                         className="form-select"
@@ -578,20 +820,68 @@ function Productos() {
                         onChange={handleChange}
                       >
                         <option value="PRODUCTO">Producto</option>
+
                         <option value="ALIMENTO">Alimento</option>
+
                         <option value="SERVICIO">Servicio</option>
                       </select>
                     </div>
+
+                    {/* ==================================
+                        PROVEEDOR
+                    ================================== */}
+
+                    {empresa?.tipo === "FERRETERIA" &&
+                      producto.tipo === "PRODUCTO" && (
+                        <div className="col-12 mb-3">
+                          <label className="form-label">Proveedor</label>
+
+                          <div className="input-group">
+                            <select
+                              className="form-select"
+                              name="proveedor_id"
+                              value={producto.proveedor_id || ""}
+                              onChange={handleChange}
+                            >
+                              <option value="">
+                                Seleccione un proveedor...
+                              </option>
+
+                              {proveedores.map((proveedor) => (
+                                <option key={proveedor.id} value={proveedor.id}>
+                                  {proveedor.nombre}
+                                </option>
+                              ))}
+                            </select>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline-success"
+                              onClick={abrirModalProveedor}
+                            >
+                              + Agregar proveedor
+                            </button>
+                          </div>
+
+                          <div className="form-text">
+                            Puedes seleccionar un proveedor existente o crear
+                            uno sin salir del formulario.
+                          </div>
+                        </div>
+                      )}
 
                     {/* STOCK */}
 
                     {producto.tipo === "PRODUCTO" && (
                       <div className="col-md-6 mb-3">
-                        <label>Cantidad en inventario</label>
+                        <label className="form-label">
+                          Cantidad en inventario
+                        </label>
 
                         <input
                           className="form-control"
                           type="number"
+                          min="0"
                           name="stock"
                           value={producto.stock}
                           onChange={handleChange}
@@ -602,11 +892,13 @@ function Productos() {
                     {/* COSTO */}
 
                     <div className="col-md-4 mb-3">
-                      <label>Costo de compra</label>
+                      <label className="form-label">Costo de compra</label>
 
                       <input
                         className="form-control"
                         type="number"
+                        min="0"
+                        step="0.01"
                         name="costo_compra"
                         value={producto.costo_compra}
                         onChange={handleChange}
@@ -616,11 +908,13 @@ function Productos() {
                     {/* GANANCIA */}
 
                     <div className="col-md-4 mb-3">
-                      <label>% Ganancia</label>
+                      <label className="form-label">% Ganancia</label>
 
                       <input
                         className="form-control"
                         type="number"
+                        min="0"
+                        step="0.01"
                         name="porcentaje_ganancia"
                         value={producto.porcentaje_ganancia}
                         onChange={handleChange}
@@ -630,11 +924,13 @@ function Productos() {
                     {/* PRECIO */}
 
                     <div className="col-md-4 mb-3">
-                      <label>Precio venta</label>
+                      <label className="form-label">Precio venta</label>
 
                       <input
                         className="form-control"
                         type="number"
+                        min="0"
+                        step="0.01"
                         name="precio_venta"
                         value={producto.precio_venta}
                         onChange={handleChange}
@@ -644,7 +940,7 @@ function Productos() {
                     {/* DESCRIPCIÓN */}
 
                     <div className="col-12 mb-3">
-                      <label>Descripción</label>
+                      <label className="form-label">Descripción</label>
 
                       <textarea
                         rows="3"
@@ -655,7 +951,7 @@ function Productos() {
                       />
                     </div>
 
-                    {/* GANANCIA POR UNIDAD */}
+                    {/* GANANCIA */}
 
                     <div className="col-12">
                       <div className="alert alert-success">
@@ -679,6 +975,149 @@ function Productos() {
 
                   <button className="btn btn-success" onClick={guardarProducto}>
                     {editando ? "Actualizar" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
+            MODAL NUEVO PROVEEDOR
+        ========================================== */}
+
+        {mostrarModalProveedor && (
+          <div
+            className="modal fade show d-block"
+            style={{
+              backgroundColor: "rgba(0,0,0,.5)",
+              zIndex: 1060,
+            }}
+          >
+            <div className="modal-dialog">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Nuevo proveedor</h5>
+
+                  <button
+                    className="btn-close"
+                    onClick={() => setMostrarModalProveedor(false)}
+                    disabled={guardandoProveedor}
+                  />
+                </div>
+
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Nombre *</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="nombre"
+                      value={nuevoProveedor.nombre}
+                      onChange={handleChangeProveedor}
+                      disabled={guardandoProveedor}
+                    />
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">RNC</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="rnc"
+                        value={nuevoProveedor.rnc}
+                        onChange={handleChangeProveedor}
+                        disabled={guardandoProveedor}
+                      />
+                    </div>
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Teléfono</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="telefono"
+                        value={nuevoProveedor.telefono}
+                        onChange={handleChangeProveedor}
+                        disabled={guardandoProveedor}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Correo</label>
+
+                    <input
+                      type="email"
+                      className="form-control"
+                      name="correo"
+                      value={nuevoProveedor.correo}
+                      onChange={handleChangeProveedor}
+                      disabled={guardandoProveedor}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Dirección</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="direccion"
+                      value={nuevoProveedor.direccion}
+                      onChange={handleChangeProveedor}
+                      disabled={guardandoProveedor}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Persona de contacto</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="contacto"
+                      value={nuevoProveedor.contacto}
+                      onChange={handleChangeProveedor}
+                      disabled={guardandoProveedor}
+                    />
+                  </div>
+
+                  <div className="mb-0">
+                    <label className="form-label">Notas</label>
+
+                    <textarea
+                      className="form-control"
+                      rows="3"
+                      name="notas"
+                      value={nuevoProveedor.notas}
+                      onChange={handleChangeProveedor}
+                      disabled={guardandoProveedor}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setMostrarModalProveedor(false)}
+                    disabled={guardandoProveedor}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-success"
+                    onClick={guardarNuevoProveedor}
+                    disabled={guardandoProveedor}
+                  >
+                    {guardandoProveedor ? "Guardando..." : "Guardar proveedor"}
                   </button>
                 </div>
               </div>

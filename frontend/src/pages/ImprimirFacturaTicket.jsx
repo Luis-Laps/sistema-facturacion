@@ -13,102 +13,49 @@ function ImprimirFacturaTicket() {
   const [error, setError] = useState("");
 
   // ==========================================
+  // PREPARAR MODO IMPRESIÓN
+  // ==========================================
+  useEffect(() => {
+    document.body.classList.add("ticket-printing");
+
+    return () => {
+      document.body.classList.remove("ticket-printing");
+    };
+  }, []);
+
+  // ==========================================
   // CARGAR DATOS
   // ==========================================
-
-  const cargarDatos = async () => {
-    try {
-      setCargando(true);
-      setError("");
-
-      const [facturaRes, empresaRes] = await Promise.all([
-        api.get(`/facturas/${id}`),
-        api.get("/configuracion"),
-      ]);
-
-      setFactura(facturaRes.data);
-      setEmpresa(empresaRes.data);
-    } catch (error) {
-      console.error("Error al cargar datos del ticket:", error);
-
-      setError(
-        error.response?.data?.mensaje || "No se pudo cargar la factura.",
-      );
-    } finally {
-      setCargando(false);
-    }
-  };
-
   useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        setCargando(true);
+        setError("");
+
+        const [facturaRes, empresaRes] = await Promise.all([
+          api.get(`/facturas/${id}`),
+          api.get("/configuracion"),
+        ]);
+
+        setFactura(facturaRes.data);
+        setEmpresa(empresaRes.data);
+      } catch (error) {
+        console.error("Error al cargar datos del ticket:", error);
+
+        setError(
+          error.response?.data?.mensaje || "No se pudo cargar la factura.",
+        );
+      } finally {
+        setCargando(false);
+      }
+    };
+
     cargarDatos();
   }, [id]);
 
   // ==========================================
-  // CARGANDO
+  // HELPERS
   // ==========================================
-
-  if (cargando) {
-    return (
-      <div className="container mt-5 text-center">
-        <h3>Cargando factura...</h3>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // ERROR
-  // ==========================================
-
-  if (error) {
-    return (
-      <div className="container mt-5 text-center">
-        <div className="alert alert-danger">{error}</div>
-      </div>
-    );
-  }
-
-  if (!factura || !empresa) {
-    return (
-      <div className="container mt-5 text-center">
-        <h3>No se encontraron los datos.</h3>
-      </div>
-    );
-  }
-
-  const colorPrincipal = empresa.color_principal || "#198754";
-
-  const datosFactura = factura.factura;
-
-  // ==========================================
-  // CÁLCULOS
-  // ==========================================
-
-  // Subtotal de productos/servicios
-  const subtotalProductos = factura.detalle.reduce((total, item) => {
-    return total + Number(item.subtotal || 0);
-  }, 0);
-
-  // Descuento general de la factura
-  const descuento = Number(datosFactura.descuento || 0);
-
-  const descuentoTipo = datosFactura.descuento_tipo || null;
-
-  // Subtotal después del descuento
-  const subtotalConDescuento = Math.max(0, subtotalProductos - descuento);
-
-  // Propina
-  const propina = Number(datosFactura.propina || 0);
-
-  // ITBIS
-  const itbis = Number(datosFactura.itbis || 0);
-
-  // Total
-  const total = Number(datosFactura.total || 0);
-
-  // ==========================================
-  // FORMATEAR MONEDA
-  // ==========================================
-
   const formatearMoneda = (valor) => {
     return Number(valor || 0).toLocaleString("es-DO", {
       minimumFractionDigits: 2,
@@ -116,256 +63,286 @@ function ImprimirFacturaTicket() {
     });
   };
 
+  const formatearFecha = (fecha) => {
+    if (!fecha) return "";
+
+    return new Date(fecha).toLocaleString("es-DO", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "America/Santo_Domingo",
+    });
+  };
+
   // ==========================================
-  // TICKET
+  // ESTADOS DE CARGA
+  // ==========================================
+  if (cargando) {
+    return (
+      <div className="ticket-loading-screen">
+        <h3>Cargando factura...</h3>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="ticket-loading-screen">
+        <div className="alert alert-danger">{error}</div>
+      </div>
+    );
+  }
+
+  if (!factura?.factura || !empresa) {
+    return (
+      <div className="ticket-loading-screen">
+        <h3>No se encontraron los datos de la factura.</h3>
+      </div>
+    );
+  }
+
+  const datosFactura = factura.factura;
+  const detalle = factura.detalle || [];
+
+  const colorPrincipal = empresa.color_principal || "#198754";
+
+  // ==========================================
+  // DATOS GUARDADOS EN LA FACTURA
   // ==========================================
 
-  const Ticket = ({ titulo }) => (
-    <div
-      className="ticket"
-      style={{
-        "--color-principal": colorPrincipal,
-      }}
-    >
-      {/* ======================================
-          EMPRESA
-      ====================================== */}
-
-      <div className="empresa">
-        {empresa.logo_url ? (
-          <img
-            src={empresa.logo_url}
-            alt={`Logo de ${empresa.nombre}`}
-            className="logo"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        ) : null}
-
-        <h2>{empresa.nombre}</h2>
-
-        {empresa.rnc && <p>RNC: {empresa.rnc}</p>}
-
-        {empresa.direccion && <p>{empresa.direccion}</p>}
-
-        {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
-
-        {empresa.correo && <p>{empresa.correo}</p>}
-
-        <hr />
-
-        <h3>{titulo}</h3>
-
-        <p className="cajero">
-          Cajero:{" "}
-          {datosFactura.usuario_nombre ||
-            datosFactura.usuario ||
-            "No identificado"}
-        </p>
-      </div>
-
-      {/* ======================================
-          INFORMACIÓN FACTURA
-      ====================================== */}
-
-      <div className="info-ticket">
-        <div className="fila">
-          <span>No. Factura</span>
-          <span>#{datosFactura.id}</span>
-        </div>
-
-        <div className="fila">
-          <span>Cliente</span>
-          <span>{datosFactura.cliente || "Consumidor final"}</span>
-        </div>
-
-        <div className="fila">
-          <span>Fecha</span>
-          <span>
-            {new Date(datosFactura.fecha).toLocaleString("es-DO", {
-              dateStyle: "short",
-              timeStyle: "short",
-            })}
-          </span>
-        </div>
-      </div>
-
-      <hr />
-
-      {/* ======================================
-          DETALLE
-      ====================================== */}
-
-      {factura.detalle.map((item, index) => (
-        <div key={index} className="item">
-          <div className="producto">{item.nombre}</div>
-
-          <div className="detalle-producto">
-            <span>
-              {item.cantidad} × RD$
-              {formatearMoneda(item.precio)}
-            </span>
-
-            <span>
-              RD$
-              {formatearMoneda(item.subtotal)}
-            </span>
-          </div>
-
-          {/* Descuento individual del producto */}
-          {Number(item.descuento || 0) > 0 && (
-            <div className="detalle-producto">
-              <span>Descuento</span>
-
-              <span>
-                - RD$
-                {formatearMoneda(item.descuento)}
-              </span>
-            </div>
-          )}
-
-          <hr />
-        </div>
-      ))}
-
-      {/* ======================================
-          RESUMEN DE FACTURA
-      ====================================== */}
-
-      <div className="resumen-ticket">
-        {/* SUBTOTAL */}
-        <div className="fila">
-          <span>Subtotal</span>
-
-          <span>RD$ {formatearMoneda(subtotalProductos)}</span>
-        </div>
-
-        {/* DESCUENTO GENERAL */}
-        {descuento > 0 && (
-          <>
-            <div
-              className="fila"
-              style={{
-                color: "#dc3545",
-              }}
-            >
-              <span>
-                Descuento
-                {descuentoTipo ? ` (${descuentoTipo})` : ""}
-              </span>
-
-              <span>- RD$ {formatearMoneda(descuento)}</span>
-            </div>
-
-            <div className="fila">
-              <span>Subtotal con descuento</span>
-
-              <span>RD$ {formatearMoneda(subtotalConDescuento)}</span>
-            </div>
-          </>
-        )}
-
-        {/* ITBIS */}
-        {datosFactura.itbis_aplicado && itbis > 0 && (
-          <div className="fila">
-            <span>ITBIS (18%)</span>
-
-            <span>RD$ {formatearMoneda(itbis)}</span>
-          </div>
-        )}
-
-        {/* PROPINA */}
-        {datosFactura.propina_aplicada && propina > 0 && (
-          <div className="fila">
-            <span>Propina de ley (10%)</span>
-
-            <span>RD$ {formatearMoneda(propina)}</span>
-          </div>
-        )}
-
-        {/* TOTAL */}
-        <div
-          className="total"
-          style={{
-            borderColor: colorPrincipal,
-          }}
-        >
-          <div className="titulo-total">TOTAL</div>
-
-          <div
-            className="monto-total"
-            style={{
-              color: colorPrincipal,
-            }}
-          >
-            RD$ {formatearMoneda(total)}
-          </div>
-        </div>
-      </div>
-
-      <hr />
-
-      {/* ======================================
-          FORMA DE PAGO
-      ====================================== */}
-
-      <div className="fila forma-pago">
-        <strong>Forma de pago</strong>
-
-        <span>
-          {datosFactura.forma_pago === "EFECTIVO"
-            ? "💵 Efectivo"
-            : datosFactura.forma_pago === "TARJETA"
-              ? "💳 Tarjeta"
-              : datosFactura.forma_pago === "TRANSFERENCIA"
-                ? "🏦 Transferencia"
-                : datosFactura.forma_pago || "No especificada"}
-        </span>
-      </div>
-
-      <hr />
-
-      {/* ======================================
-          FOOTER
-      ====================================== */}
-
-      <div className="footer">
-        <strong>¡Gracias por su compra!</strong>
-        <br />
-        Esperamos verle nuevamente.
-        <br />
-        <br />
-        <strong>{empresa.nombre}</strong>
-        {empresa.telefono && (
-          <>
-            <br />
-            {empresa.telefono}
-          </>
-        )}
-        {empresa.correo && (
-          <>
-            <br />
-            {empresa.correo}
-          </>
-        )}
-      </div>
-    </div>
+  // Cada detalle ya representa su subtotal de línea.
+  // No recalculamos descuentos generales ni impuestos
+  // a partir de parámetros externos: imprimimos lo que
+  // realmente quedó guardado en la factura.
+  const subtotalProductos = detalle.reduce(
+    (total, item) => total + Number(item.subtotal || 0),
+    0,
   );
 
-  // ==========================================
-  // PANTALLA
-  // ==========================================
+  const descuento = Number(datosFactura.descuento || 0);
+  const descuentoTipo = datosFactura.descuento_tipo || null;
+
+  const subtotalConDescuento = Math.max(0, subtotalProductos - descuento);
+
+  const propina = Number(datosFactura.propina || 0);
+  const itbis = Number(datosFactura.itbis || 0);
+  const total = Number(datosFactura.total || 0);
+
+  const mostrarDescuento = descuento > 0 || Boolean(descuentoTipo);
+
+  const nombreFormaPago = {
+    EFECTIVO: "💵 Efectivo",
+    TARJETA: "💳 Tarjeta",
+    TRANSFERENCIA: "🏦 Transferencia",
+  };
 
   return (
     <>
-      <div className="no-print text-center mb-3">
-        <button className="btn btn-success" onClick={() => window.print()}>
+      {/* BOTÓN SOLO PARA PANTALLA */}
+      <div className="ticket-toolbar no-print">
+        <button
+          type="button"
+          className="ticket-print-button"
+          onClick={() => window.print()}
+        >
           🖨️ Imprimir Factura
         </button>
       </div>
 
-      <Ticket titulo="FACTURA" />
+      {/* TICKET */}
+      <main
+        className="ticket-page"
+        style={{
+          "--color-principal": colorPrincipal,
+        }}
+      >
+        <section className="ticket" aria-label="Factura">
+          {/* ======================================
+              EMPRESA
+          ====================================== */}
+          <header className="empresa">
+            {empresa.logo_url && (
+              <img
+                src={empresa.logo_url}
+                alt={`Logo de ${empresa.nombre || ""}`}
+                className="logo"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            )}
+
+            <h2>{empresa.nombre}</h2>
+
+            {empresa.rnc && <p>RNC: {empresa.rnc}</p>}
+            {empresa.direccion && <p>{empresa.direccion}</p>}
+            {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
+            {empresa.correo && <p>{empresa.correo}</p>}
+          </header>
+
+          <div className="ticket-separator" />
+
+          <div className="ticket-heading">
+            <h3>FACTURA</h3>
+
+            <p className="cajero">
+              Cajero:{" "}
+              {datosFactura.usuario_nombre ||
+                datosFactura.usuario ||
+                "No identificado"}
+            </p>
+          </div>
+
+          {/* ======================================
+              INFORMACIÓN
+          ====================================== */}
+          <section className="info-ticket">
+            <div className="fila">
+              <span>No. Factura</span>
+              <span>#{datosFactura.id}</span>
+            </div>
+
+            <div className="fila">
+              <span>Cliente</span>
+              <span>{datosFactura.cliente || "Consumidor final"}</span>
+            </div>
+
+            <div className="fila">
+              <span>Fecha</span>
+              <span>{formatearFecha(datosFactura.fecha)}</span>
+            </div>
+          </section>
+
+          <div className="ticket-separator" />
+
+          {/* ======================================
+              DETALLE
+          ====================================== */}
+          <section className="ticket-items">
+            {detalle.map((item, index) => {
+              const cantidad = Number(item.cantidad || 0);
+              const precio = Number(item.precio || 0);
+              const descuentoItem = Number(item.descuento || 0);
+              const subtotalItem = Number(item.subtotal || 0);
+
+              return (
+                <div className="item" key={item.id || index}>
+                  <div className="producto">
+                    {item.nombre || item.descripcion_manual || "Producto"}
+                  </div>
+
+                  <div className="detalle-producto">
+                    <span>
+                      {cantidad} × RD$ {formatearMoneda(precio)}
+                    </span>
+
+                    <span>RD$ {formatearMoneda(subtotalItem)}</span>
+                  </div>
+
+                  {descuentoItem > 0 && (
+                    <div className="detalle-producto descuento-linea">
+                      <span>Descuento producto</span>
+                      <span>- RD$ {formatearMoneda(descuentoItem)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+
+          <div className="ticket-separator" />
+
+          {/* ======================================
+              RESUMEN
+          ====================================== */}
+          <section className="resumen-ticket">
+            <div className="fila">
+              <span>Subtotal</span>
+              <span>RD$ {formatearMoneda(subtotalProductos)}</span>
+            </div>
+
+            {mostrarDescuento && descuento > 0 && (
+              <>
+                <div className="fila fila-descuento">
+                  <span>
+                    Descuento
+                    {descuentoTipo ? ` (${descuentoTipo})` : ""}
+                  </span>
+
+                  <span>- RD$ {formatearMoneda(descuento)}</span>
+                </div>
+
+                <div className="fila">
+                  <span>Subtotal con descuento</span>
+                  <span>RD$ {formatearMoneda(subtotalConDescuento)}</span>
+                </div>
+              </>
+            )}
+
+            {datosFactura.itbis_aplicado && itbis > 0 && (
+              <div className="fila">
+                <span>ITBIS (18%)</span>
+                <span>RD$ {formatearMoneda(itbis)}</span>
+              </div>
+            )}
+
+            {datosFactura.propina_aplicada && propina > 0 && (
+              <div className="fila">
+                <span>Propina de ley (10%)</span>
+                <span>RD$ {formatearMoneda(propina)}</span>
+              </div>
+            )}
+          </section>
+
+          {/* ======================================
+              TOTAL
+          ====================================== */}
+          <section className="total">
+            <div className="titulo-total">TOTAL</div>
+
+            <div className="monto-total" style={{ color: colorPrincipal }}>
+              RD$ {formatearMoneda(total)}
+            </div>
+          </section>
+
+          <div className="ticket-separator" />
+
+          {/* ======================================
+              FORMA DE PAGO
+          ====================================== */}
+          <div className="fila forma-pago">
+            <strong>Forma de pago</strong>
+
+            <span>
+              {nombreFormaPago[datosFactura.forma_pago] ||
+                datosFactura.forma_pago ||
+                "No especificada"}
+            </span>
+          </div>
+
+          <div className="ticket-separator" />
+
+          {/* ======================================
+              PIE
+          ====================================== */}
+          <footer className="footer">
+            <strong>¡Gracias por su compra!</strong>
+
+            <div>Esperamos verle nuevamente.</div>
+
+            <div className="footer-empresa">
+              <strong>{empresa.nombre}</strong>
+
+              {empresa.telefono && <div>{empresa.telefono}</div>}
+
+              {empresa.correo && <div>{empresa.correo}</div>}
+            </div>
+          </footer>
+        </section>
+      </main>
     </>
   );
 }

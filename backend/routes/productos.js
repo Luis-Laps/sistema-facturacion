@@ -19,6 +19,60 @@ const validarPermisoProductos = (req, res, next) => {
 
   next();
 };
+
+// ==========================================
+// OBTENER TIPO DE EMPRESA
+// ==========================================
+
+const obtenerTipoEmpresa = async (empresaId) => {
+  const result = await pool.query(
+    `
+    SELECT tipo
+    FROM empresas
+    WHERE id = $1
+    `,
+    [empresaId],
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error("Empresa no encontrada.");
+  }
+
+  return result.rows[0].tipo;
+};
+
+// ==========================================
+// VALIDAR PROVEEDOR
+// ==========================================
+
+const validarProveedor = async (proveedorId, empresaId) => {
+  if (!proveedorId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      id,
+      nombre
+    FROM proveedores
+    WHERE
+      id = $1
+      AND empresa_id = $2
+      AND activo = TRUE
+    `,
+    [proveedorId, empresaId],
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(
+      "El proveedor no pertenece a esta empresa o está inactivo.",
+    );
+  }
+
+  return result.rows[0];
+};
+
 // ==========================================
 // LISTAR PRODUCTOS
 // ==========================================
@@ -33,52 +87,71 @@ router.get("/", validarToken, async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT
-        p.id,
-        p.codigo,
-        p.nombre,
-        p.descripcion,
-        p.costo_compra,
-        p.precio_venta,
-        p.stock,
-        p.tipo,
-        p.categoria_id,
-        c.nombre AS categoria
-      FROM productos p
-      LEFT JOIN categorias c
-        ON c.id = p.categoria_id
-        AND c.empresa_id = p.empresa_id
-      WHERE
-        p.activo = TRUE
-        AND p.empresa_id = $1
-        AND (
-          p.nombre ILIKE $2
-          OR p.codigo ILIKE $2
-          OR c.nombre ILIKE $2
-        )
-      ORDER BY p.id DESC
-      LIMIT $3
-      OFFSET $4
-      `,
+        SELECT
+          p.id,
+          p.codigo,
+          p.nombre,
+          p.descripcion,
+          p.costo_compra,
+          p.precio_venta,
+          p.stock,
+          p.tipo,
+          p.categoria_id,
+          c.nombre AS categoria,
+
+          pp.proveedor_id,
+          pr.nombre AS proveedor_nombre
+
+        FROM productos p
+
+        LEFT JOIN categorias c
+          ON c.id = p.categoria_id
+          AND c.empresa_id = p.empresa_id
+
+        LEFT JOIN producto_proveedores pp
+          ON pp.producto_id = p.id
+          AND pp.es_principal = TRUE
+
+        LEFT JOIN proveedores pr
+          ON pr.id = pp.proveedor_id
+          AND pr.empresa_id = p.empresa_id
+
+        WHERE
+          p.activo = TRUE
+          AND p.empresa_id = $1
+          AND (
+            p.nombre ILIKE $2
+            OR p.codigo ILIKE $2
+            OR c.nombre ILIKE $2
+          )
+
+        ORDER BY p.id DESC
+
+        LIMIT $3
+        OFFSET $4
+        `,
       [req.usuario.empresa_id, `%${buscar}%`, limite, offset],
     );
 
     const total = await pool.query(
       `
-      SELECT COUNT(*) total
-      FROM productos p
-      LEFT JOIN categorias c
-        ON c.id = p.categoria_id
-        AND c.empresa_id = p.empresa_id
-      WHERE
-        p.activo = TRUE
-        AND p.empresa_id = $1
-        AND (
-          p.nombre ILIKE $2
-          OR p.codigo ILIKE $2
-          OR c.nombre ILIKE $2
-        )
-      `,
+        SELECT COUNT(*) total
+
+        FROM productos p
+
+        LEFT JOIN categorias c
+          ON c.id = p.categoria_id
+          AND c.empresa_id = p.empresa_id
+
+        WHERE
+          p.activo = TRUE
+          AND p.empresa_id = $1
+          AND (
+            p.nombre ILIKE $2
+            OR p.codigo ILIKE $2
+            OR c.nombre ILIKE $2
+          )
+        `,
       [req.usuario.empresa_id, `%${buscar}%`],
     );
 
@@ -86,41 +159,58 @@ router.get("/", validarToken, async (req, res) => {
 
     const resumenInventario = await pool.query(
       `
-  SELECT
-    COALESCE(
-      SUM(costo_compra * stock)
-      FILTER (WHERE tipo = 'PRODUCTO' AND stock > 0),
-      0
-    ) AS inversion,
+          SELECT
+            COALESCE(
+              SUM(costo_compra * stock)
+              FILTER (
+                WHERE tipo = 'PRODUCTO'
+                AND stock > 0
+              ),
+              0
+            ) AS inversion,
 
-    COALESCE(
-      SUM(
-        (precio_venta - costo_compra) * stock
-      )
-      FILTER (WHERE tipo = 'PRODUCTO' AND stock > 0),
-      0
-    ) AS ganancia_proyectada,
+            COALESCE(
+              SUM(
+                (precio_venta - costo_compra) * stock
+              )
+              FILTER (
+                WHERE tipo = 'PRODUCTO'
+                AND stock > 0
+              ),
+              0
+            ) AS ganancia_proyectada,
 
-    COALESCE(
-      SUM(precio_venta * stock)
-      FILTER (WHERE tipo = 'PRODUCTO' AND stock > 0),
-      0
-    ) AS valor_total
-  FROM productos
-  WHERE empresa_id = $1
-  AND activo = TRUE
-  `,
+            COALESCE(
+              SUM(precio_venta * stock)
+              FILTER (
+                WHERE tipo = 'PRODUCTO'
+                AND stock > 0
+              ),
+              0
+            ) AS valor_total
+
+          FROM productos
+
+          WHERE
+            empresa_id = $1
+            AND activo = TRUE
+          `,
       [req.usuario.empresa_id],
     );
 
     res.json({
       data: result.rows,
+
       total: totalRegistros,
+
       page: pagina,
+
       totalPages: Math.ceil(totalRegistros / limite),
 
       inversion: Number(resumenInventario.rows[0].inversion),
+
       gananciaProyectada: Number(resumenInventario.rows[0].ganancia_proyectada),
+
       valorTotal: Number(resumenInventario.rows[0].valor_total),
     });
   } catch (error) {
@@ -137,7 +227,11 @@ router.get("/", validarToken, async (req, res) => {
 // ==========================================
 
 router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    await client.query("BEGIN");
+
     const {
       codigo,
       nombre,
@@ -147,67 +241,89 @@ router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
       precio_venta,
       stock,
       tipo,
+      proveedor_id,
     } = req.body;
 
+    const empresaId = req.usuario.empresa_id;
+
+    // ==========================================
+    // VALIDACIONES
+    // ==========================================
+
     if (!nombre || !categoria_id || (tipo === "PRODUCTO" && !codigo)) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "Complete todos los campos obligatorios.",
       });
     }
 
     if (Number(costo_compra) < 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "El costo de compra no puede ser negativo.",
       });
     }
 
     if (Number(precio_venta) < 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "El precio de venta no puede ser negativo.",
       });
     }
 
     if (Number(stock) < 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "La cantidad no puede ser negativa.",
       });
     }
 
     // ==========================================
-    // VERIFICAR CATEGORÍA
+    // CATEGORÍA
     // ==========================================
 
-    const categoria = await pool.query(
+    const categoria = await client.query(
       `
-      SELECT id
-      FROM categorias
-      WHERE id = $1
-      AND empresa_id = $2
-      `,
-      [categoria_id, req.usuario.empresa_id],
+          SELECT id
+          FROM categorias
+          WHERE
+            id = $1
+            AND empresa_id = $2
+          `,
+      [categoria_id, empresaId],
     );
 
     if (categoria.rows.length === 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "La categoría no pertenece a esta empresa.",
       });
     }
 
     // ==========================================
-    // VERIFICAR CÓDIGO EN ESTA EMPRESA
+    // CÓDIGO
     // ==========================================
+
     if (tipo === "PRODUCTO") {
-      const existe = await pool.query(
+      const existe = await client.query(
         `
-    SELECT id
-    FROM productos
-    WHERE codigo = $1
-    AND empresa_id = $2
-    `,
-        [codigo, req.usuario.empresa_id],
+            SELECT id
+            FROM productos
+            WHERE
+              codigo = $1
+              AND empresa_id = $2
+            `,
+        [codigo, empresaId],
       );
 
       if (existe.rows.length > 0) {
+        await client.query("ROLLBACK");
+
         return res.status(400).json({
           mensaje: "Ya existe un producto con ese código en esta empresa.",
         });
@@ -215,45 +331,153 @@ router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
     }
 
     // ==========================================
+    // PROVEEDOR
+    // ==========================================
+
+    let proveedorFinal = null;
+
+    if (proveedor_id) {
+      const tipoEmpresa = await obtenerTipoEmpresa(empresaId);
+
+      if (tipoEmpresa !== "FERRETERIA") {
+        await client.query("ROLLBACK");
+
+        return res.status(403).json({
+          mensaje:
+            "Los proveedores solo están disponibles para empresas ferretería.",
+        });
+      }
+
+      const proveedor = await client.query(
+        `
+            SELECT id
+            FROM proveedores
+            WHERE
+              id = $1
+              AND empresa_id = $2
+              AND activo = TRUE
+            `,
+        [proveedor_id, empresaId],
+      );
+
+      if (proveedor.rows.length === 0) {
+        await client.query("ROLLBACK");
+
+        return res.status(400).json({
+          mensaje: "El proveedor no pertenece a esta empresa o está inactivo.",
+        });
+      }
+
+      proveedorFinal = Number(proveedor_id);
+    }
+
+    // ==========================================
     // CREAR PRODUCTO
     // ==========================================
 
-    const result = await pool.query(
+    const result = await client.query(
       `
-      INSERT INTO productos (
-        codigo,
-        nombre,
-        descripcion,
-        categoria_id,
-        costo_compra,
-        precio_venta,
-        stock,
-        tipo,
-        empresa_id
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      RETURNING *
-      `,
+          INSERT INTO productos (
+            codigo,
+            nombre,
+            descripcion,
+            categoria_id,
+            costo_compra,
+            precio_venta,
+            stock,
+            tipo,
+            empresa_id
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            $8,
+            $9
+          )
+          RETURNING *
+          `,
       [
-        codigo,
+        codigo || null,
         nombre,
-        descripcion,
+        descripcion || null,
         categoria_id,
         costo_compra,
         precio_venta,
         stock,
         tipo || "PRODUCTO",
-        req.usuario.empresa_id,
+        empresaId,
       ],
     );
 
-    res.status(201).json(result.rows[0]);
+    const producto = result.rows[0];
+
+    // ==========================================
+    // ASIGNAR PROVEEDOR PRINCIPAL
+    // ==========================================
+
+    if (proveedorFinal && (tipo || "PRODUCTO") === "PRODUCTO") {
+      await client.query(
+        `
+          INSERT INTO producto_proveedores (
+            producto_id,
+            proveedor_id,
+            es_principal,
+            costo
+          )
+          VALUES (
+            $1,
+            $2,
+            TRUE,
+            $3
+          )
+          `,
+        [producto.id, proveedorFinal, costo_compra],
+      );
+    }
+
+    await client.query("COMMIT");
+
+    // ==========================================
+    // DEVOLVER PRODUCTO + PROVEEDOR
+    // ==========================================
+
+    const finalResult = await pool.query(
+      `
+          SELECT
+            p.*,
+            pp.proveedor_id,
+            pr.nombre AS proveedor_nombre
+          FROM productos p
+
+          LEFT JOIN producto_proveedores pp
+            ON pp.producto_id = p.id
+            AND pp.es_principal = TRUE
+
+          LEFT JOIN proveedores pr
+            ON pr.id = pp.proveedor_id
+
+          WHERE p.id = $1
+          `,
+      [producto.id],
+    );
+
+    res.status(201).json(finalResult.rows[0]);
   } catch (error) {
+    await client.query("ROLLBACK");
+
     console.error(error);
 
     res.status(500).json({
       mensaje: "Error al crear producto",
+      error: error.message,
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -262,7 +486,11 @@ router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
 // ==========================================
 
 router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    await client.query("BEGIN");
+
     const { id } = req.params;
 
     const {
@@ -274,121 +502,266 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
       precio_venta,
       stock,
       tipo,
+      proveedor_id,
     } = req.body;
 
+    const empresaId = req.usuario.empresa_id;
+
+    // ==========================================
+    // VALIDACIONES
+    // ==========================================
+
     if (!codigo || !nombre || !categoria_id) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "Complete todos los campos obligatorios.",
       });
     }
 
     if (Number(costo_compra) < 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "El costo de compra no puede ser negativo.",
       });
     }
 
     if (Number(precio_venta) < 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "El precio de venta no puede ser negativo.",
       });
     }
 
     if (Number(stock) < 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "La cantidad no puede ser negativa.",
       });
     }
 
     // ==========================================
-    // VERIFICAR CATEGORÍA
+    // CATEGORÍA
     // ==========================================
 
-    const categoria = await pool.query(
+    const categoria = await client.query(
       `
-      SELECT id
-      FROM categorias
-      WHERE id = $1
-      AND empresa_id = $2
-      `,
-      [categoria_id, req.usuario.empresa_id],
+          SELECT id
+          FROM categorias
+          WHERE
+            id = $1
+            AND empresa_id = $2
+          `,
+      [categoria_id, empresaId],
     );
 
     if (categoria.rows.length === 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "La categoría no pertenece a esta empresa.",
       });
     }
 
     // ==========================================
-    // VERIFICAR CÓDIGO
+    // CÓDIGO
     // ==========================================
 
-    const existe = await pool.query(
+    const existe = await client.query(
       `
-      SELECT id
-      FROM productos
-      WHERE codigo = $1
-      AND empresa_id = $2
-      AND id <> $3
-      `,
-      [codigo, req.usuario.empresa_id, id],
+          SELECT id
+          FROM productos
+          WHERE
+            codigo = $1
+            AND empresa_id = $2
+            AND id <> $3
+          `,
+      [codigo, empresaId, id],
     );
 
     if (existe.rows.length > 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         mensaje: "Ya existe otro producto con ese código en esta empresa.",
       });
     }
 
     // ==========================================
+    // VERIFICAR PRODUCTO
+    // ==========================================
+
+    const productoExiste = await client.query(
+      `
+          SELECT id
+          FROM productos
+          WHERE
+            id = $1
+            AND empresa_id = $2
+          `,
+      [id, empresaId],
+    );
+
+    if (productoExiste.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        mensaje: "Producto no encontrado.",
+      });
+    }
+
+    // ==========================================
+    // PROVEEDOR
+    // ==========================================
+
+    let proveedorFinal = null;
+
+    if (proveedor_id) {
+      const tipoEmpresa = await obtenerTipoEmpresa(empresaId);
+
+      if (tipoEmpresa !== "FERRETERIA") {
+        await client.query("ROLLBACK");
+
+        return res.status(403).json({
+          mensaje:
+            "Los proveedores solo están disponibles para empresas ferretería.",
+        });
+      }
+
+      const proveedor = await client.query(
+        `
+            SELECT id
+            FROM proveedores
+            WHERE
+              id = $1
+              AND empresa_id = $2
+              AND activo = TRUE
+            `,
+        [proveedor_id, empresaId],
+      );
+
+      if (proveedor.rows.length === 0) {
+        await client.query("ROLLBACK");
+
+        return res.status(400).json({
+          mensaje: "El proveedor no pertenece a esta empresa o está inactivo.",
+        });
+      }
+
+      proveedorFinal = Number(proveedor_id);
+    }
+
+    // ==========================================
     // ACTUALIZAR PRODUCTO
     // ==========================================
 
-    const result = await pool.query(
+    const result = await client.query(
       `
-      UPDATE productos
-      SET
-        codigo = $1,
-        nombre = $2,
-        descripcion = $3,
-        categoria_id = $4,
-        costo_compra = $5,
-        precio_venta = $6,
-        stock = $7,
-        tipo = $8
-      WHERE
-        id = $9
-        AND empresa_id = $10
-      RETURNING *
-      `,
+          UPDATE productos
+          SET
+            codigo = $1,
+            nombre = $2,
+            descripcion = $3,
+            categoria_id = $4,
+            costo_compra = $5,
+            precio_venta = $6,
+            stock = $7,
+            tipo = $8
+          WHERE
+            id = $9
+            AND empresa_id = $10
+          RETURNING *
+          `,
       [
         codigo,
         nombre,
-        descripcion,
+        descripcion || null,
         categoria_id,
         costo_compra,
         precio_venta,
         stock,
         tipo || "PRODUCTO",
         id,
-        req.usuario.empresa_id,
+        empresaId,
       ],
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        mensaje: "Producto no encontrado.",
-      });
+    // ==========================================
+    // ACTUALIZAR PROVEEDOR PRINCIPAL
+    // ==========================================
+
+    await client.query(
+      `
+        DELETE FROM producto_proveedores
+        WHERE
+          producto_id = $1
+        `,
+      [id],
+    );
+
+    if (proveedorFinal && (tipo || "PRODUCTO") === "PRODUCTO") {
+      await client.query(
+        `
+          INSERT INTO producto_proveedores (
+            producto_id,
+            proveedor_id,
+            es_principal,
+            costo
+          )
+          VALUES (
+            $1,
+            $2,
+            TRUE,
+            $3
+          )
+          `,
+        [id, proveedorFinal, costo_compra],
+      );
     }
 
-    res.json(result.rows[0]);
+    await client.query("COMMIT");
+
+    // ==========================================
+    // DEVOLVER PRODUCTO COMPLETO
+    // ==========================================
+
+    const finalResult = await pool.query(
+      `
+          SELECT
+            p.*,
+            pp.proveedor_id,
+            pr.nombre AS proveedor_nombre
+          FROM productos p
+
+          LEFT JOIN producto_proveedores pp
+            ON pp.producto_id = p.id
+            AND pp.es_principal = TRUE
+
+          LEFT JOIN proveedores pr
+            ON pr.id = pp.proveedor_id
+
+          WHERE
+            p.id = $1
+            AND p.empresa_id = $2
+          `,
+      [id, empresaId],
+    );
+
+    res.json(finalResult.rows[0]);
   } catch (error) {
+    await client.query("ROLLBACK");
+
     console.error(error);
 
     res.status(500).json({
       mensaje: "Error al actualizar producto",
+      error: error.message,
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -406,11 +779,12 @@ router.delete(
 
       const result = await pool.query(
         `
-        DELETE FROM productos
-        WHERE id = $1
-        AND empresa_id = $2
-        RETURNING id
-        `,
+          DELETE FROM productos
+          WHERE
+            id = $1
+            AND empresa_id = $2
+          RETURNING id
+          `,
         [id, req.usuario.empresa_id],
       );
 

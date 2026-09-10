@@ -17,11 +17,19 @@ function Navbar() {
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   // ==========================================
+  // TIPO DE EMPRESA
+  // ==========================================
+
+  const esFerreteria = empresa?.tipo === "FERRETERIA";
+
+  // ==========================================
   // CARGAR EMPRESA
   // ==========================================
 
   useEffect(() => {
-    // El SUPER_ADMIN no pertenece a una empresa específica
+    // El SUPER_ADMIN no pertenece
+    // a una empresa específica.
+
     if (rol === "SUPER_ADMIN") {
       setEmpresa(null);
       return;
@@ -30,6 +38,7 @@ function Navbar() {
     const cargarEmpresa = async () => {
       try {
         const response = await api.get("/configuracion");
+
         setEmpresa(response.data);
       } catch (error) {
         console.error("Error al cargar empresa:", error);
@@ -173,7 +182,9 @@ function Navbar() {
         <div className="sidebar-content">
           <div className="sidebar-section-title">PRINCIPAL</div>
 
-          {/* DASHBOARD */}
+          {/* ==================================
+              DASHBOARD
+          ================================== */}
 
           <Link
             to="/dashboard"
@@ -187,114 +198,250 @@ function Navbar() {
             <span>Dashboard</span>
           </Link>
 
-          {/* PRODUCTOS */}
-          {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
-            <Link
-              to="/productos"
-              className={`sidebar-link ${
-                estaActivo("/productos") ? "sidebar-link-active" : ""
-              }`}
-              onClick={() => setSidebarAbierto(false)}
-            >
-              <span className="sidebar-icon">📦</span>
-
-              <span>Productos</span>
-            </Link>
-          )}
-
-          {/* CLIENTES */}
-          <Link
-            to="/clientes"
-            className={`sidebar-link ${
-              estaActivo("/clientes") ? "sidebar-link-active" : ""
-            }`}
-            onClick={() => setSidebarAbierto(false)}
-          >
-            <span className="sidebar-icon">👥</span>
-            <span>Clientes</span>
-          </Link>
-
           {/* ==================================
-              CONTROL DE ORDEN
-              SOLO EMPRESAS CON MANEJO DE MESAS
+              MENÚ FERRETERÍA
           ================================== */}
 
-          {empresa?.manejo_mesas === true && (
-            <Link
-              to="/control-orden"
-              className={`sidebar-link ${
-                estaActivo("/control-orden") ? "sidebar-link-active" : ""
-              }`}
-              onClick={() => setSidebarAbierto(false)}
-            >
-              <span className="sidebar-icon">🍽️</span>
-
-              <span>Control de Orden</span>
-            </Link>
-          )}
-
-          {/* ==================================
-              FACTURACIÓN
-          ================================== */}
-
-          <button
-            type="button"
-            className={`sidebar-link sidebar-link-button ${
-              menuAbierto === "facturacion" ? "sidebar-link-open" : ""
-            }`}
-            onClick={() => toggleMenu("facturacion")}
-          >
-            <span className="sidebar-icon">🧾</span>
-
-            <span className="sidebar-link-text">Facturación</span>
-
-            <span className="sidebar-arrow">
-              {menuAbierto === "facturacion" ? "⌃" : "⌄"}
-            </span>
-          </button>
-
-          {menuAbierto === "facturacion" && (
-            <div className="sidebar-submenu">
-              <Link
-                to="/facturas"
-                className={`sidebar-sublink ${
-                  estaActivo("/facturas") ? "sidebar-sublink-active" : ""
-                }`}
-                onClick={() => setSidebarAbierto(false)}
-              >
-                Nueva factura
-              </Link>
-
-              <Link
-                to="/historial-facturas"
-                className={`sidebar-sublink ${
-                  estaActivo("/historial-facturas")
-                    ? "sidebar-sublink-active"
-                    : ""
-                }`}
-                onClick={() => setSidebarAbierto(false)}
-              >
-                Historial
-              </Link>
-
-              <Link
-                to="/cotizacion"
-                className={`sidebar-sublink ${
-                  estaActivo("/cotizacion") ? "sidebar-sublink-active" : ""
-                }`}
-                onClick={() => setSidebarAbierto(false)}
-              >
-                Cotización
-              </Link>
-            </div>
-          )}
-
-          {/* ==================================
-              REPORTES
-          ================================== */}
-
-          {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+          {esFerreteria ? (
             <>
+              {/* ==================================
+                  REPORTES
+              ================================== */}
+
+              <button
+                type="button"
+                className={`sidebar-link sidebar-link-button ${
+                  menuAbierto === "reportes" ? "sidebar-link-open" : ""
+                }`}
+                onClick={() => toggleMenu("reportes")}
+              >
+                <span className="sidebar-icon">📊</span>
+
+                <span className="sidebar-link-text">Reportes</span>
+
+                <span className="sidebar-arrow">
+                  {menuAbierto === "reportes" ? "⌃" : "⌄"}
+                </span>
+              </button>
+
+              {menuAbierto === "reportes" && (
+                <div className="sidebar-submenu">
+                  <Link
+                    to="/reportes-caja"
+                    className={`sidebar-sublink ${
+                      estaActivo("/reportes-caja")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Reportes de caja
+                  </Link>
+                </div>
+              )}
+
+              {/* ==================================
+                  FERRETERÍA
+              ================================== */}
+
+              <button
+                type="button"
+                className={`sidebar-link sidebar-link-button ${
+                  menuAbierto === "ferreteria" ? "sidebar-link-open" : ""
+                }`}
+                onClick={() => toggleMenu("ferreteria")}
+              >
+                <span className="sidebar-icon">🔧</span>
+
+                <span className="sidebar-link-text">Ferretería</span>
+
+                <span className="sidebar-arrow">
+                  {menuAbierto === "ferreteria" ? "⌃" : "⌄"}
+                </span>
+              </button>
+
+              {menuAbierto === "ferreteria" && (
+                <div className="sidebar-submenu">
+                  {/* NUEVA FACTURA */}
+
+                  <Link
+                    to="/ferreteria/nueva-factura"
+                    className={`sidebar-sublink ${
+                      estaActivo("/ferreteria/nueva-factura")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Nueva Factura
+                  </Link>
+
+                  {/* FACTURAS ABIERTAS */}
+
+                  <Link
+                    to="/ferreteria/facturas-abiertas"
+                    className={`sidebar-sublink ${
+                      estaActivo("/ferreteria/facturas-abiertas")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Facturas Abiertas
+                  </Link>
+                </div>
+              )}
+
+              {/* ==================================
+                  PROVEEDORES
+                  SOLO ADMIN / SUPER_ADMIN
+              ================================== */}
+
+              {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+                <Link
+                  to="/proveedores"
+                  className={`sidebar-link ${
+                    estaActivo("/proveedores") ? "sidebar-link-active" : ""
+                  }`}
+                  onClick={() => setSidebarAbierto(false)}
+                >
+                  <span className="sidebar-icon">🚚</span>
+
+                  <span>Proveedores</span>
+                </Link>
+              )}
+
+              {/* ==================================
+                  PRODUCTOS
+              ================================== */}
+
+              {rol !== "CAJERO" && (
+                <Link
+                  to="/productos"
+                  className={`sidebar-link ${
+                    estaActivo("/productos") ? "sidebar-link-active" : ""
+                  }`}
+                  onClick={() => setSidebarAbierto(false)}
+                >
+                  <span className="sidebar-icon">📦</span>
+
+                  <span>Productos</span>
+                </Link>
+              )}
+            </>
+          ) : (
+            <>
+              {/* ==================================
+                  PRODUCTOS
+              ================================== */}
+
+              <Link
+                to="/productos"
+                className={`sidebar-link ${
+                  estaActivo("/productos") ? "sidebar-link-active" : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                <span className="sidebar-icon">📦</span>
+
+                <span>Productos</span>
+              </Link>
+
+              {/* ==================================
+                  CLIENTES
+              ================================== */}
+
+              <Link
+                to="/clientes"
+                className={`sidebar-link ${
+                  estaActivo("/clientes") ? "sidebar-link-active" : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                <span className="sidebar-icon">👥</span>
+
+                <span>Clientes</span>
+              </Link>
+
+              {/* ==================================
+                  CONTROL DE ORDEN
+                  SOLO EMPRESAS CON MESAS
+              ================================== */}
+
+              {empresa?.manejo_mesas === true && (
+                <Link
+                  to="/control-orden"
+                  className={`sidebar-link ${
+                    estaActivo("/control-orden") ? "sidebar-link-active" : ""
+                  }`}
+                  onClick={() => setSidebarAbierto(false)}
+                >
+                  <span className="sidebar-icon">🍽️</span>
+
+                  <span>Control de Orden</span>
+                </Link>
+              )}
+
+              {/* ==================================
+                  FACTURACIÓN
+              ================================== */}
+
+              <button
+                type="button"
+                className={`sidebar-link sidebar-link-button ${
+                  menuAbierto === "facturacion" ? "sidebar-link-open" : ""
+                }`}
+                onClick={() => toggleMenu("facturacion")}
+              >
+                <span className="sidebar-icon">🧾</span>
+
+                <span className="sidebar-link-text">Facturación</span>
+
+                <span className="sidebar-arrow">
+                  {menuAbierto === "facturacion" ? "⌃" : "⌄"}
+                </span>
+              </button>
+
+              {menuAbierto === "facturacion" && (
+                <div className="sidebar-submenu">
+                  <Link
+                    to="/facturas"
+                    className={`sidebar-sublink ${
+                      estaActivo("/facturas") ? "sidebar-sublink-active" : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Nueva factura
+                  </Link>
+
+                  <Link
+                    to="/historial-facturas"
+                    className={`sidebar-sublink ${
+                      estaActivo("/historial-facturas")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Historial
+                  </Link>
+
+                  <Link
+                    to="/cotizacion"
+                    className={`sidebar-sublink ${
+                      estaActivo("/cotizacion") ? "sidebar-sublink-active" : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Cotización
+                  </Link>
+                </div>
+              )}
+
+              {/* ==================================
+                  REPORTES
+              ================================== */}
+
               <button
                 type="button"
                 className={`sidebar-link sidebar-link-button ${
@@ -331,9 +478,10 @@ function Navbar() {
 
           {/* ==================================
               ADMINISTRACIÓN
+              SOLO EMPRESA ESTÁNDAR
           ================================== */}
 
-          {rol === "ADMIN" && (
+          {!esFerreteria && rol === "ADMIN" && (
             <>
               <div className="sidebar-section-title sidebar-section-margin">
                 ADMINISTRACIÓN
