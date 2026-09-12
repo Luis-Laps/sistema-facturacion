@@ -26,6 +26,7 @@ import FerreteriaNuevaFactura from "./pages/FerreteriaNuevaFactura";
 import FerreteriaFacturasAbiertas from "./pages/FerreteriaFacturasAbiertas";
 import FerreteriaFacturaAbierta from "./pages/FerreteriaFacturaAbierta";
 import Proveedores from "./pages/Proveedores";
+import FerreteriaHistorialFacturas from "./pages/FerreteriaHistorialFacturas";
 
 // ==========================================
 // COMPONENTES
@@ -106,6 +107,11 @@ function App() {
                   <Route
                     path="/ferreteria/facturas-abiertas/:id"
                     element={<FerreteriaFacturaAbierta />}
+                  />
+
+                  <Route
+                    path="/ferreteria/historial-facturas"
+                    element={<FerreteriaHistorialFacturas />}
                   />
 
                   {/* ==================================

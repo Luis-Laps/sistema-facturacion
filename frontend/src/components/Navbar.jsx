@@ -289,6 +289,19 @@ function Navbar() {
                   >
                     Facturas Abiertas
                   </Link>
+                  {/* HISTORIAL DE FACTURAS */}
+
+                  <Link
+                    to="/ferreteria/historial-facturas"
+                    className={`sidebar-sublink ${
+                      estaActivo("/ferreteria/historial-facturas")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Historial de Facturas
+                  </Link>
                 </div>
               )}
 
