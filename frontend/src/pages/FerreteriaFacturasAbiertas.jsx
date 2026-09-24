@@ -10,6 +10,9 @@ function FerreteriaFacturasAbiertas() {
   const [facturas, setFacturas] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  // Filtro por tipo de factura abierta
+  const [filtroTipo, setFiltroTipo] = useState("TODAS");
+
   // ==========================================
   // FORMATO DINERO
   // ==========================================
@@ -41,6 +44,43 @@ function FerreteriaFacturasAbiertas() {
       timeStyle: "short",
     });
   };
+
+  // ==========================================
+  // TIPO DE FACTURA
+  // ==========================================
+
+  const obtenerTipoFactura = (tipo) => {
+    switch (tipo) {
+      case "PENDIENTE_PAGO":
+        return {
+          texto: "Pendiente de pago",
+          clase: "bg-warning text-dark",
+          icono: "🟡",
+        };
+
+      case "PENDIENTE_ENTREGA":
+        return {
+          texto: "Pendiente de entrega",
+          clase: "bg-info text-dark",
+          icono: "🔵",
+        };
+
+      default:
+        return {
+          texto: "Abierta",
+          clase: "bg-secondary",
+          icono: "⚪",
+        };
+    }
+  };
+
+  const facturasFiltradas = facturas.filter((factura) => {
+    if (filtroTipo === "TODAS") {
+      return true;
+    }
+
+    return (factura.tipo || "ABIERTA") === filtroTipo;
+  });
 
   // ==========================================
   // CARGAR FACTURAS
@@ -101,7 +141,25 @@ function FerreteriaFacturasAbiertas() {
 
     navigate(`/ferreteria/facturas-abiertas/${id}`);
   };
+  // ==========================================
+  // IMPRIMIR FACTURA
+  // ==========================================
 
+  const imprimirFactura = (id) => {
+    console.log("ID RECIBIDO PARA IMPRIMIR:", id);
+
+    if (id === undefined || id === null || id === "") {
+      Swal.fire({
+        icon: "error",
+        title: "ID inválido",
+        text: "La factura seleccionada no tiene un ID válido.",
+      });
+
+      return;
+    }
+
+    navigate(`/ferreteria/facturas-abiertas/${id}/imprimir`);
+  };
   // ==========================================
   // CANCELAR FACTURA
   // ==========================================
@@ -215,12 +273,96 @@ function FerreteriaFacturasAbiertas() {
       </div>
 
       {/* ======================================
+          FILTROS
+      ====================================== */}
+
+      <div className="card shadow-sm mb-4">
+        <div className="card-body">
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <span className="fw-semibold me-2">Filtrar:</span>
+
+            <button
+              type="button"
+              className={`btn btn-sm ${
+                filtroTipo === "TODAS" ? "btn-dark" : "btn-outline-dark"
+              }`}
+              onClick={() => setFiltroTipo("TODAS")}
+            >
+              Todas
+              <span className="ms-2 badge bg-light text-dark">
+                {facturas.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`btn btn-sm ${
+                filtroTipo === "PENDIENTE_PAGO"
+                  ? "btn-warning"
+                  : "btn-outline-warning"
+              }`}
+              onClick={() => setFiltroTipo("PENDIENTE_PAGO")}
+            >
+              🟡 Pendiente de pago
+              <span className="ms-2 badge bg-light text-dark">
+                {
+                  facturas.filter(
+                    (factura) =>
+                      (factura.tipo || "ABIERTA") === "PENDIENTE_PAGO",
+                  ).length
+                }
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`btn btn-sm ${
+                filtroTipo === "PENDIENTE_ENTREGA"
+                  ? "btn-info"
+                  : "btn-outline-info"
+              }`}
+              onClick={() => setFiltroTipo("PENDIENTE_ENTREGA")}
+            >
+              🔵 Pendiente de entrega
+              <span className="ms-2 badge bg-light text-dark">
+                {
+                  facturas.filter(
+                    (factura) =>
+                      (factura.tipo || "ABIERTA") === "PENDIENTE_ENTREGA",
+                  ).length
+                }
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`btn btn-sm ${
+                filtroTipo === "ABIERTA"
+                  ? "btn-secondary"
+                  : "btn-outline-secondary"
+              }`}
+              onClick={() => setFiltroTipo("ABIERTA")}
+            >
+              ⚪ Abiertas
+              <span className="ms-2 badge bg-light text-dark">
+                {
+                  facturas.filter(
+                    (factura) => (factura.tipo || "ABIERTA") === "ABIERTA",
+                  ).length
+                }
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================
           TABLA
       ====================================== */}
 
       <div className="card shadow-sm">
         <div className="card-body p-0">
-          {facturas.length === 0 ? (
+          {facturasFiltradas.length === 0 ? (
             <div className="text-center py-5">
               <div
                 style={{
@@ -230,19 +372,35 @@ function FerreteriaFacturasAbiertas() {
                 📂
               </div>
 
-              <h5 className="mt-3">No hay facturas abiertas</h5>
+              <h5 className="mt-3">
+                {facturas.length === 0
+                  ? "No hay facturas abiertas"
+                  : "No hay facturas de este tipo"}
+              </h5>
 
               <p className="text-muted">
-                Las ventas pendientes aparecerán aquí.
+                {facturas.length === 0
+                  ? "Las ventas pendientes aparecerán aquí."
+                  : "Prueba seleccionando otro filtro."}
               </p>
 
-              <button
-                type="button"
-                className="btn btn-success"
-                onClick={nuevaFactura}
-              >
-                Crear factura
-              </button>
+              {facturas.length === 0 ? (
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={nuevaFactura}
+                >
+                  Crear factura
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={() => setFiltroTipo("TODAS")}
+                >
+                  Ver todas
+                </button>
+              )}
             </div>
           ) : (
             <div className="table-responsive">
@@ -254,6 +412,8 @@ function FerreteriaFacturasAbiertas() {
                     <th>Cliente / Referencia</th>
 
                     <th>Vendedor</th>
+
+                    <th>Tipo</th>
 
                     <th>Actualización</th>
 
@@ -268,7 +428,7 @@ function FerreteriaFacturasAbiertas() {
                 </thead>
 
                 <tbody>
-                  {facturas.map((factura) => {
+                  {facturasFiltradas.map((factura) => {
                     // =====================================
                     // OBTENER ID DIRECTAMENTE DEL OBJETO
                     // =====================================
@@ -298,6 +458,20 @@ function FerreteriaFacturasAbiertas() {
                         </td>
 
                         <td>
+                          {(() => {
+                            const tipoFactura = obtenerTipoFactura(
+                              factura.tipo || "ABIERTA",
+                            );
+
+                            return (
+                              <span className={`badge ${tipoFactura.clase}`}>
+                                {tipoFactura.icono} {tipoFactura.texto}
+                              </span>
+                            );
+                          })()}
+                        </td>
+
+                        <td>
                           {formatearFecha(
                             factura.updated_at || factura.created_at,
                           )}
@@ -318,8 +492,8 @@ function FerreteriaFacturasAbiertas() {
                         <td>
                           <div className="d-flex justify-content-center gap-2">
                             {/* ==============================
-                                ABRIR
-                            ============================== */}
+      ABRIR
+  ============================== */}
 
                             <button
                               type="button"
@@ -330,8 +504,21 @@ function FerreteriaFacturasAbiertas() {
                             </button>
 
                             {/* ==============================
-                                CANCELAR
-                            ============================== */}
+      IMPRIMIR
+  ============================== */}
+
+                            <button
+                              type="button"
+                              className="btn btn-outline-dark btn-sm"
+                              onClick={() => imprimirFactura(facturaId)}
+                              title="Imprimir factura"
+                            >
+                              🖨️
+                            </button>
+
+                            {/* ==============================
+      CANCELAR
+  ============================== */}
 
                             <button
                               type="button"

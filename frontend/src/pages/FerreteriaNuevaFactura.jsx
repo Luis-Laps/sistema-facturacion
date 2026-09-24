@@ -336,6 +336,33 @@ function FerreteriaNuevaFactura() {
       return;
     }
 
+    const seleccionTipo = await Swal.fire({
+      icon: "question",
+      title: "Tipo de factura abierta",
+      text: "Seleccione cómo desea clasificar esta factura.",
+      input: "select",
+      inputOptions: {
+        PENDIENTE_PAGO: "🟡 Pendiente de pago",
+        PENDIENTE_ENTREGA: "🔵 Pendiente de entrega",
+        ABIERTA: "⚪ Abierta",
+      },
+      inputValue: "ABIERTA",
+      inputPlaceholder: "Seleccione un tipo",
+      showCancelButton: true,
+      confirmButtonText: "Guardar factura",
+      cancelButtonText: "Cancelar",
+      reverseButtons: true,
+      inputValidator: (value) => {
+        if (!value) {
+          return "Seleccione un tipo de factura.";
+        }
+      },
+    });
+
+    if (!seleccionTipo.isConfirmed) {
+      return;
+    }
+
     try {
       setProcesando(true);
 
@@ -348,6 +375,7 @@ function FerreteriaNuevaFactura() {
           descuento: Number(item.descuento || 0),
         })),
         itbis_aplicado: aplicarItbis,
+        tipo: seleccionTipo.value,
       });
 
       const facturaAbiertaId = response.data.factura?.id;

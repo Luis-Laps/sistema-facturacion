@@ -17,6 +17,8 @@ const controlOrdenToutes = require("./routes/controlOrden");
 const ferreteriaRoutes = require("./routes/ferreteria");
 const ferreteriaAbiertasRoutes = require("./routes/ferreteriaAbiertas");
 const proveedoresRoutes = require("./routes/proveedores");
+const inventarioRoutes = require("./routes/inventario");
+const modulosRoutes = require("./routes/modulos");
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use("/api/control-orden", controlOrdenToutes);
 app.use("/api/ferreteria", ferreteriaRoutes);
 app.use("/api/ferreteria-abiertas", ferreteriaAbiertasRoutes);
 app.use("/api/proveedores", proveedoresRoutes);
+app.use("/api/inventario", inventarioRoutes);
+app.use("/api/modulos", modulosRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Sistema de Facturación");

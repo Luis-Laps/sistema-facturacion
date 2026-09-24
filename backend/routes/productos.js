@@ -485,12 +485,12 @@ router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
 // ACTUALIZAR PRODUCTO
 // ==========================================
 
+// ==========================================
+// ACTUALIZAR PRODUCTO
+// ==========================================
+
 router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
-  const client = await pool.connect();
-
   try {
-    await client.query("BEGIN");
-
     const { id } = req.params;
 
     const {
@@ -500,268 +500,185 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
       categoria_id,
       costo_compra,
       precio_venta,
-      stock,
       tipo,
-      proveedor_id,
     } = req.body;
 
-    const empresaId = req.usuario.empresa_id;
+    const tipoFinal = tipo || "PRODUCTO";
 
     // ==========================================
     // VALIDACIONES
     // ==========================================
 
-    if (!codigo || !nombre || !categoria_id) {
-      await client.query("ROLLBACK");
-
+    if (!nombre || !categoria_id) {
       return res.status(400).json({
         mensaje: "Complete todos los campos obligatorios.",
       });
     }
 
-    if (Number(costo_compra) < 0) {
-      await client.query("ROLLBACK");
+    // Los PRODUCTO deben tener código.
+    if (tipoFinal === "PRODUCTO" && !codigo) {
+      return res.status(400).json({
+        mensaje: "El código es obligatorio para los productos.",
+      });
+    }
 
+    if (Number(costo_compra) < 0) {
       return res.status(400).json({
         mensaje: "El costo de compra no puede ser negativo.",
       });
     }
 
     if (Number(precio_venta) < 0) {
-      await client.query("ROLLBACK");
-
       return res.status(400).json({
         mensaje: "El precio de venta no puede ser negativo.",
       });
     }
 
-    if (Number(stock) < 0) {
-      await client.query("ROLLBACK");
+    // ==========================================
+    // VERIFICAR QUE EL PRODUCTO EXISTA
+    // ==========================================
 
+    const productoActual = await pool.query(
+      `
+      SELECT
+        id,
+        stock,
+        tipo
+      FROM productos
+      WHERE
+        id = $1
+        AND empresa_id = $2
+      `,
+      [id, req.usuario.empresa_id],
+    );
+
+    if (productoActual.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Producto no encontrado.",
+      });
+    }
+
+    const productoExistente = productoActual.rows[0];
+
+    // ==========================================
+    // VERIFICAR CAMBIO DE TIPO
+    // ==========================================
+
+    // Si un producto tiene existencias,
+    // no permitimos convertirlo directamente
+    // en ALIMENTO o SERVICIO.
+    //
+    // Primero debe llevar su inventario a 0
+    // mediante Inventario.
+    if (
+      productoExistente.tipo === "PRODUCTO" &&
+      tipoFinal !== "PRODUCTO" &&
+      Number(productoExistente.stock) > 0
+    ) {
       return res.status(400).json({
-        mensaje: "La cantidad no puede ser negativa.",
+        mensaje:
+          "No puede cambiar este producto a Alimento o Servicio mientras tenga existencias. Primero lleve su inventario a 0 desde Inventario.",
       });
     }
 
     // ==========================================
-    // CATEGORÍA
+    // VERIFICAR CATEGORÍA
     // ==========================================
 
-    const categoria = await client.query(
+    const categoria = await pool.query(
       `
-          SELECT id
-          FROM categorias
-          WHERE
-            id = $1
-            AND empresa_id = $2
-          `,
-      [categoria_id, empresaId],
+      SELECT id
+      FROM categorias
+      WHERE
+        id = $1
+        AND empresa_id = $2
+      `,
+      [categoria_id, req.usuario.empresa_id],
     );
 
     if (categoria.rows.length === 0) {
-      await client.query("ROLLBACK");
-
       return res.status(400).json({
         mensaje: "La categoría no pertenece a esta empresa.",
       });
     }
 
     // ==========================================
-    // CÓDIGO
+    // VERIFICAR CÓDIGO
     // ==========================================
 
-    const existe = await client.query(
-      `
-          SELECT id
-          FROM productos
-          WHERE
-            codigo = $1
-            AND empresa_id = $2
-            AND id <> $3
-          `,
-      [codigo, empresaId, id],
-    );
-
-    if (existe.rows.length > 0) {
-      await client.query("ROLLBACK");
-
-      return res.status(400).json({
-        mensaje: "Ya existe otro producto con ese código en esta empresa.",
-      });
-    }
-
-    // ==========================================
-    // VERIFICAR PRODUCTO
-    // ==========================================
-
-    const productoExiste = await client.query(
-      `
-          SELECT id
-          FROM productos
-          WHERE
-            id = $1
-            AND empresa_id = $2
-          `,
-      [id, empresaId],
-    );
-
-    if (productoExiste.rows.length === 0) {
-      await client.query("ROLLBACK");
-
-      return res.status(404).json({
-        mensaje: "Producto no encontrado.",
-      });
-    }
-
-    // ==========================================
-    // PROVEEDOR
-    // ==========================================
-
-    let proveedorFinal = null;
-
-    if (proveedor_id) {
-      const tipoEmpresa = await obtenerTipoEmpresa(empresaId);
-
-      if (tipoEmpresa !== "FERRETERIA") {
-        await client.query("ROLLBACK");
-
-        return res.status(403).json({
-          mensaje:
-            "Los proveedores solo están disponibles para empresas ferretería.",
-        });
-      }
-
-      const proveedor = await client.query(
+    if (codigo) {
+      const existe = await pool.query(
         `
-            SELECT id
-            FROM proveedores
-            WHERE
-              id = $1
-              AND empresa_id = $2
-              AND activo = TRUE
-            `,
-        [proveedor_id, empresaId],
+        SELECT id
+        FROM productos
+        WHERE
+          codigo = $1
+          AND empresa_id = $2
+          AND id <> $3
+        `,
+        [codigo, req.usuario.empresa_id, id],
       );
 
-      if (proveedor.rows.length === 0) {
-        await client.query("ROLLBACK");
-
+      if (existe.rows.length > 0) {
         return res.status(400).json({
-          mensaje: "El proveedor no pertenece a esta empresa o está inactivo.",
+          mensaje: "Ya existe otro producto con ese código en esta empresa.",
         });
       }
-
-      proveedorFinal = Number(proveedor_id);
     }
 
     // ==========================================
     // ACTUALIZAR PRODUCTO
     // ==========================================
+    //
+    // IMPORTANTE:
+    // STOCK NO SE ACTUALIZA AQUÍ.
+    //
+    // El stock solamente será modificado
+    // desde el módulo INVENTARIO.
+    //
 
-    const result = await client.query(
+    const result = await pool.query(
       `
-          UPDATE productos
-          SET
-            codigo = $1,
-            nombre = $2,
-            descripcion = $3,
-            categoria_id = $4,
-            costo_compra = $5,
-            precio_venta = $6,
-            stock = $7,
-            tipo = $8
-          WHERE
-            id = $9
-            AND empresa_id = $10
-          RETURNING *
-          `,
+      UPDATE productos
+      SET
+        codigo = $1,
+        nombre = $2,
+        descripcion = $3,
+        categoria_id = $4,
+        costo_compra = $5,
+        precio_venta = $6,
+        tipo = $7
+      WHERE
+        id = $8
+        AND empresa_id = $9
+      RETURNING *
+      `,
       [
-        codigo,
+        codigo || null,
         nombre,
         descripcion || null,
         categoria_id,
         costo_compra,
         precio_venta,
-        stock,
-        tipo || "PRODUCTO",
+        tipoFinal,
         id,
-        empresaId,
+        req.usuario.empresa_id,
       ],
     );
 
-    // ==========================================
-    // ACTUALIZAR PROVEEDOR PRINCIPAL
-    // ==========================================
-
-    await client.query(
-      `
-        DELETE FROM producto_proveedores
-        WHERE
-          producto_id = $1
-        `,
-      [id],
-    );
-
-    if (proveedorFinal && (tipo || "PRODUCTO") === "PRODUCTO") {
-      await client.query(
-        `
-          INSERT INTO producto_proveedores (
-            producto_id,
-            proveedor_id,
-            es_principal,
-            costo
-          )
-          VALUES (
-            $1,
-            $2,
-            TRUE,
-            $3
-          )
-          `,
-        [id, proveedorFinal, costo_compra],
-      );
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Producto no encontrado.",
+      });
     }
 
-    await client.query("COMMIT");
-
-    // ==========================================
-    // DEVOLVER PRODUCTO COMPLETO
-    // ==========================================
-
-    const finalResult = await pool.query(
-      `
-          SELECT
-            p.*,
-            pp.proveedor_id,
-            pr.nombre AS proveedor_nombre
-          FROM productos p
-
-          LEFT JOIN producto_proveedores pp
-            ON pp.producto_id = p.id
-            AND pp.es_principal = TRUE
-
-          LEFT JOIN proveedores pr
-            ON pr.id = pp.proveedor_id
-
-          WHERE
-            p.id = $1
-            AND p.empresa_id = $2
-          `,
-      [id, empresaId],
-    );
-
-    res.json(finalResult.rows[0]);
+    res.json(result.rows[0]);
   } catch (error) {
-    await client.query("ROLLBACK");
-
-    console.error(error);
+    console.error("Error al actualizar producto:", error);
 
     res.status(500).json({
       mensaje: "Error al actualizar producto",
-      error: error.message,
     });
-  } finally {
-    client.release();
   }
 });
 

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import Navbar from "../components/Navbar";
-
 import api from "../services/api";
-
 import Swal from "sweetalert2";
 
 function HistorialFacturas() {
+  const navigate = useNavigate();
+
   const [facturas, setFacturas] = useState([]);
   const [detalleFactura, setDetalleFactura] = useState(null);
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
@@ -14,7 +15,6 @@ function HistorialFacturas() {
   const cargarFacturas = async () => {
     try {
       const response = await api.get("/facturas");
-
       setFacturas(response.data);
     } catch (error) {
       console.error(error);
@@ -29,9 +29,25 @@ function HistorialFacturas() {
       setMostrarDetalle(true);
     } catch (error) {
       console.error(error);
-
       alert("Error al cargar factura");
     }
+  };
+
+  // ==========================================
+  // REIMPRIMIR FACTURA COMO COPIA
+  // ==========================================
+  const reimprimirFactura = (id) => {
+    if (id === undefined || id === null || id === "") {
+      Swal.fire({
+        icon: "error",
+        title: "ID inválido",
+        text: "La factura seleccionada no tiene un ID válido.",
+      });
+
+      return;
+    }
+
+    navigate(`/imprimir-factura/${id}?copia=1`);
   };
 
   const eliminarFactura = async (id) => {
@@ -144,6 +160,7 @@ function HistorialFacturas() {
 
                   <td>
                     <div className="btn-group">
+                      {/* VER */}
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() => verDetalle(factura.id)}
@@ -151,6 +168,15 @@ function HistorialFacturas() {
                         👁 Ver
                       </button>
 
+                      {/* REIMPRIMIR COMO COPIA */}
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => reimprimirFactura(factura.id)}
+                      >
+                        🖨️ Reimprimir
+                      </button>
+
+                      {/* ELIMINAR */}
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => eliminarFactura(factura.id)}
@@ -165,6 +191,10 @@ function HistorialFacturas() {
           </table>
         </div>
       </div>
+
+      {/* ==========================================
+          MODAL DETALLE
+      ========================================== */}
 
       {mostrarDetalle && detalleFactura && (
         <div

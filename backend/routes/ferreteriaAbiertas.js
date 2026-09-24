@@ -55,33 +55,32 @@ router.get("/", validarToken, validarFerreteria, async (req, res) => {
   try {
     const result = await pool.query(
       `
-        SELECT
-          fa.id,
-          fa.empresa_id,
-          fa.usuario_id,
-          fa.nombre_cliente,
-          fa.nota,
-          fa.estado,
-          fa.subtotal,
-          fa.descuento,
-          fa.itbis_aplicado,
-          fa.itbis,
-          fa.total,
-          fa.created_at,
-          fa.updated_at,
-          u.nombre AS usuario_nombre,
-          u.usuario AS usuario
-        FROM facturas_abiertas fa
-        LEFT JOIN usuarios u
-          ON u.id = fa.usuario_id
-          AND u.empresa_id = fa.empresa_id
-        WHERE
-          fa.empresa_id = $1
-          AND fa.estado = 'ABIERTA'
-        ORDER BY
-          fa.updated_at DESC,
-          fa.id DESC
-        `,
+      SELECT
+        fa.id,
+        fa.empresa_id,
+        fa.usuario_id,
+        fa.nombre_cliente,
+        fa.nota,
+        fa.estado,
+        fa.tipo,
+        fa.subtotal,
+        fa.descuento,
+        fa.itbis_aplicado,
+        fa.itbis,
+        fa.total,
+        fa.created_at,
+        fa.updated_at,
+        u.nombre AS usuario_nombre,
+        u.usuario AS usuario
+      FROM facturas_abiertas fa
+      LEFT JOIN usuarios u
+        ON u.id = fa.usuario_id
+        AND u.empresa_id = fa.empresa_id
+      WHERE
+        fa.empresa_id = $1
+        AND fa.estado = 'ABIERTA'
+      ORDER BY fa.updated_at DESC, fa.id DESC
+      `,
       [req.usuario.empresa_id],
     );
 
@@ -105,31 +104,32 @@ router.get("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     const facturaResult = await pool.query(
       `
-        SELECT
-          fa.id,
-          fa.empresa_id,
-          fa.usuario_id,
-          fa.nombre_cliente,
-          fa.nota,
-          fa.estado,
-          fa.subtotal,
-          fa.descuento,
-          fa.itbis_aplicado,
-          fa.itbis,
-          fa.total,
-          fa.created_at,
-          fa.updated_at,
-          fa.closed_at,
-          u.nombre AS usuario_nombre,
-          u.usuario AS usuario
-        FROM facturas_abiertas fa
-        LEFT JOIN usuarios u
-          ON u.id = fa.usuario_id
-          AND u.empresa_id = fa.empresa_id
-        WHERE
-          fa.id = $1
-          AND fa.empresa_id = $2
-        `,
+      SELECT
+        fa.id,
+        fa.empresa_id,
+        fa.usuario_id,
+        fa.nombre_cliente,
+        fa.nota,
+        fa.estado,
+        fa.tipo,
+        fa.subtotal,
+        fa.descuento,
+        fa.itbis_aplicado,
+        fa.itbis,
+        fa.total,
+        fa.created_at,
+        fa.updated_at,
+        fa.closed_at,
+        u.nombre AS usuario_nombre,
+        u.usuario AS usuario
+      FROM facturas_abiertas fa
+      LEFT JOIN usuarios u
+        ON u.id = fa.usuario_id
+        AND u.empresa_id = fa.empresa_id
+      WHERE
+        fa.id = $1
+        AND fa.empresa_id = $2
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -141,27 +141,27 @@ router.get("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     const detalleResult = await pool.query(
       `
-        SELECT
-          fad.id,
-          fad.factura_abierta_id,
-          fad.producto_id,
-          fad.cantidad,
-          fad.precio,
-          fad.descuento,
-          fad.subtotal,
-          fad.created_at,
-          p.codigo,
-          p.nombre,
-          p.stock,
-          p.costo_compra
-        FROM facturas_abiertas_detalle fad
-        INNER JOIN productos p
-          ON p.id = fad.producto_id
-          AND p.empresa_id = $2
-        WHERE
-          fad.factura_abierta_id = $1
-        ORDER BY fad.id ASC
-        `,
+      SELECT
+        fad.id,
+        fad.factura_abierta_id,
+        fad.producto_id,
+        fad.cantidad,
+        fad.precio,
+        fad.descuento,
+        fad.subtotal,
+        fad.created_at,
+        p.codigo,
+        p.nombre,
+        p.stock,
+        p.costo_compra
+      FROM facturas_abiertas_detalle fad
+      INNER JOIN productos p
+        ON p.id = fad.producto_id
+        AND p.empresa_id = $2
+      WHERE
+        fad.factura_abierta_id = $1
+      ORDER BY fad.id ASC
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -193,15 +193,21 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
       nota = "",
       productos,
       itbis_aplicado = false,
+      tipo = "ABIERTA",
     } = req.body;
 
     if (!Array.isArray(productos) || productos.length === 0) {
       throw new Error("Agregue al menos un producto.");
     }
 
+    const tiposPermitidos = ["ABIERTA", "PENDIENTE_PAGO", "PENDIENTE_ENTREGA"];
+
+    if (!tiposPermitidos.includes(tipo)) {
+      throw new Error("Tipo de factura abierta inválido.");
+    }
+
     let subtotal = 0;
     let descuentoTotal = 0;
-
     const detalleValidado = [];
 
     for (const item of productos) {
@@ -225,20 +231,20 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
 
       const productoResult = await client.query(
         `
-          SELECT
-            id,
-            codigo,
-            nombre,
-            precio_venta,
-            costo_compra,
-            stock,
-            tipo
-          FROM productos
-          WHERE
-            id = $1
-            AND empresa_id = $2
-            AND activo = TRUE
-          `,
+        SELECT
+          id,
+          codigo,
+          nombre,
+          precio_venta,
+          costo_compra,
+          stock,
+          tipo
+        FROM productos
+        WHERE
+          id = $1
+          AND empresa_id = $2
+          AND activo = TRUE
+        `,
         [productoId, req.usuario.empresa_id],
       );
 
@@ -281,7 +287,6 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
     }
 
     subtotal = Math.round((subtotal + Number.EPSILON) * 100) / 100;
-
     descuentoTotal = Math.round((descuentoTotal + Number.EPSILON) * 100) / 100;
 
     let aplicarItbis = false;
@@ -293,7 +298,6 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
       }
 
       aplicarItbis = true;
-
       itbis = Math.round((subtotal * 0.18 + Number.EPSILON) * 100) / 100;
     }
 
@@ -301,41 +305,44 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
 
     const facturaResult = await client.query(
       `
-          INSERT INTO facturas_abiertas (
-            empresa_id,
-            usuario_id,
-            nombre_cliente,
-            nota,
-            estado,
-            subtotal,
-            descuento,
-            itbis_aplicado,
-            itbis,
-            total,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            'ABIERTA',
-            $5,
-            $6,
-            $7,
-            $8,
-            $9,
-            NOW(),
-            NOW()
-          )
-          RETURNING *
-          `,
+      INSERT INTO facturas_abiertas (
+        empresa_id,
+        usuario_id,
+        nombre_cliente,
+        nota,
+        estado,
+        tipo,
+        subtotal,
+        descuento,
+        itbis_aplicado,
+        itbis,
+        total,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        'ABIERTA',
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+      `,
       [
         req.usuario.empresa_id,
         req.usuario.id,
         nombre_cliente?.trim() || null,
         nota?.trim() || null,
+        tipo,
         subtotal,
         descuentoTotal,
         aplicarItbis,
@@ -349,25 +356,25 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
     for (const item of detalleValidado) {
       await client.query(
         `
-          INSERT INTO facturas_abiertas_detalle (
-            factura_abierta_id,
-            producto_id,
-            cantidad,
-            precio,
-            descuento,
-            subtotal,
-            created_at
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            $6,
-            NOW()
-          )
-          `,
+        INSERT INTO facturas_abiertas_detalle (
+          factura_abierta_id,
+          producto_id,
+          cantidad,
+          precio,
+          descuento,
+          subtotal,
+          created_at
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          NOW()
+        )
+        `,
         [
           facturaAbiertaId,
           item.productoId,
@@ -396,9 +403,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
   } finally {
     client.release();
   }
-});
-
-// ==========================================
+}); // ==========================================
 // ACTUALIZAR FACTURA ABIERTA
 // ==========================================
 
@@ -415,19 +420,18 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
       nota = "",
       productos,
       itbis_aplicado = false,
+      tipo = "ABIERTA",
     } = req.body;
 
     const facturaResult = await client.query(
       `
-          SELECT
-            id,
-            estado
-          FROM facturas_abiertas
-          WHERE
-            id = $1
-            AND empresa_id = $2
-          FOR UPDATE
-          `,
+      SELECT id, estado
+      FROM facturas_abiertas
+      WHERE
+        id = $1
+        AND empresa_id = $2
+      FOR UPDATE
+      `,
       [id, req.usuario.empresa_id],
     );
 
@@ -443,16 +447,19 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
       throw new Error("Agregue al menos un producto.");
     }
 
+    const tiposPermitidos = ["ABIERTA", "PENDIENTE_PAGO", "PENDIENTE_ENTREGA"];
+
+    if (!tiposPermitidos.includes(tipo)) {
+      throw new Error("Tipo de factura abierta inválido.");
+    }
+
     let subtotal = 0;
     let descuentoTotal = 0;
-
     const detalleValidado = [];
 
     for (const item of productos) {
       const productoId = Number(item.producto_id);
-
       const cantidad = Number(item.cantidad);
-
       const descuento = Number(item.descuento || 0);
 
       if (!Number.isInteger(productoId) || productoId <= 0) {
@@ -471,20 +478,17 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
 
       const productoResult = await client.query(
         `
-            SELECT
-              id,
-              codigo,
-              nombre,
-              precio_venta,
-              costo_compra,
-              stock,
-              tipo
-            FROM productos
-            WHERE
-              id = $1
-              AND empresa_id = $2
-              AND activo = TRUE
-            `,
+        SELECT
+          id,
+          nombre,
+          precio_venta,
+          tipo,
+          activo
+        FROM productos
+        WHERE
+          id = $1
+          AND empresa_id = $2
+        `,
         [productoId, req.usuario.empresa_id],
       );
 
@@ -494,10 +498,8 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
 
       const producto = productoResult.rows[0];
 
-      if (producto.tipo !== "PRODUCTO") {
-        throw new Error(
-          `El producto "${producto.nombre}" no es válido para ferretería.`,
-        );
+      if (producto.activo !== true || producto.tipo !== "PRODUCTO") {
+        throw new Error(`El producto "${producto.nombre}" no está disponible.`);
       }
 
       const precio = Number(producto.precio_venta);
@@ -547,65 +549,34 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     await client.query(
       `
-        UPDATE facturas_abiertas
-        SET
-          nombre_cliente = $1,
-          nota = $2,
-          subtotal = $3,
-          descuento = $4,
-          itbis_aplicado = $5,
-          itbis = $6,
-          total = $7,
-          updated_at = NOW()
-        WHERE
-          id = $8
-          AND empresa_id = $9
-        `,
-      [
-        nombre_cliente?.trim() || null,
-        nota?.trim() || null,
-        subtotal,
-        descuentoTotal,
-        aplicarItbis,
-        itbis,
-        total,
-        id,
-        req.usuario.empresa_id,
-      ],
-    );
-
-    await client.query(
-      `
-        DELETE FROM
-          facturas_abiertas_detalle
-        WHERE
-          factura_abierta_id = $1
-        `,
+      DELETE FROM facturas_abiertas_detalle
+      WHERE factura_abierta_id = $1
+      `,
       [id],
     );
 
     for (const item of detalleValidado) {
       await client.query(
         `
-          INSERT INTO facturas_abiertas_detalle (
-            factura_abierta_id,
-            producto_id,
-            cantidad,
-            precio,
-            descuento,
-            subtotal,
-            created_at
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            $6,
-            NOW()
-          )
-          `,
+        INSERT INTO facturas_abiertas_detalle (
+          factura_abierta_id,
+          producto_id,
+          cantidad,
+          precio,
+          descuento,
+          subtotal,
+          created_at
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          NOW()
+        )
+        `,
         [
           id,
           item.productoId,
@@ -617,22 +588,43 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
       );
     }
 
-    const actualizadaResult = await client.query(
+    const updateResult = await client.query(
       `
-          SELECT *
-          FROM facturas_abiertas
-          WHERE
-            id = $1
-            AND empresa_id = $2
-          `,
-      [id, req.usuario.empresa_id],
+      UPDATE facturas_abiertas
+      SET
+        nombre_cliente = $1,
+        nota = $2,
+        tipo = $3,
+        subtotal = $4,
+        descuento = $5,
+        itbis_aplicado = $6,
+        itbis = $7,
+        total = $8,
+        updated_at = NOW()
+      WHERE
+        id = $9
+        AND empresa_id = $10
+      RETURNING *
+      `,
+      [
+        nombre_cliente?.trim() || null,
+        nota?.trim() || null,
+        tipo,
+        subtotal,
+        descuentoTotal,
+        aplicarItbis,
+        itbis,
+        total,
+        id,
+        req.usuario.empresa_id,
+      ],
     );
 
     await client.query("COMMIT");
 
     res.json({
       mensaje: "Factura abierta actualizada correctamente.",
-      factura: actualizadaResult.rows[0],
+      factura: updateResult.rows[0],
     });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -657,27 +649,28 @@ router.delete("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     const result = await pool.query(
       `
-        UPDATE facturas_abiertas
-        SET
-          estado = 'CANCELADA',
-          updated_at = NOW()
-        WHERE
-          id = $1
-          AND empresa_id = $2
-          AND estado = 'ABIERTA'
-        RETURNING id
-        `,
+      UPDATE facturas_abiertas
+      SET
+        estado = 'CANCELADA',
+        updated_at = NOW()
+      WHERE
+        id = $1
+        AND empresa_id = $2
+        AND estado = 'ABIERTA'
+      RETURNING id
+      `,
       [id, req.usuario.empresa_id],
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({
-        mensaje: "Factura abierta no encontrada o ya procesada.",
+        mensaje: "Factura abierta no encontrada o ya cerrada.",
       });
     }
 
     res.json({
       mensaje: "Factura abierta cancelada correctamente.",
+      id: result.rows[0].id,
     });
   } catch (error) {
     console.error("Error al cancelar factura abierta:", error);
@@ -718,13 +711,13 @@ router.post(
 
       const facturaResult = await client.query(
         `
-          SELECT *
-          FROM facturas_abiertas
-          WHERE
-            id = $1
-            AND empresa_id = $2
-          FOR UPDATE
-          `,
+        SELECT *
+        FROM facturas_abiertas
+        WHERE
+          id = $1
+          AND empresa_id = $2
+        FOR UPDATE
+        `,
         [id, req.usuario.empresa_id],
       );
 
@@ -744,16 +737,16 @@ router.post(
 
       const cajaResult = await client.query(
         `
-          SELECT id
-          FROM cajas
-          WHERE
-            usuario_id = $1
-            AND empresa_id = $2
-            AND estado = 'ABIERTA'
-          ORDER BY id DESC
-          LIMIT 1
-          FOR UPDATE
-          `,
+        SELECT id
+        FROM cajas
+        WHERE
+          usuario_id = $1
+          AND empresa_id = $2
+          AND estado = 'ABIERTA'
+        ORDER BY id DESC
+        LIMIT 1
+        FOR UPDATE
+        `,
         [req.usuario.id, req.usuario.empresa_id],
       );
 
@@ -769,25 +762,26 @@ router.post(
 
       const detalleResult = await client.query(
         `
-          SELECT
-            fad.id,
-            fad.producto_id,
-            fad.cantidad,
-            fad.precio,
-            fad.descuento,
-            p.nombre,
-            p.costo_compra,
-            p.stock,
-            p.tipo,
-            p.activo
-          FROM facturas_abiertas_detalle fad
-          INNER JOIN productos p
-            ON p.id = fad.producto_id
-            AND p.empresa_id = $2
-          WHERE
-            fad.factura_abierta_id = $1
-          ORDER BY fad.id ASC
-          `,
+        SELECT
+          fad.id,
+          fad.producto_id,
+          fad.cantidad,
+          fad.precio,
+          fad.descuento,
+          p.nombre,
+          p.costo_compra,
+          p.stock,
+          p.tipo,
+          p.activo
+        FROM facturas_abiertas_detalle fad
+        INNER JOIN productos p
+          ON p.id = fad.producto_id
+          AND p.empresa_id = $2
+        WHERE
+          fad.factura_abierta_id = $1
+        ORDER BY fad.id ASC
+        FOR UPDATE OF p
+        `,
         [id, req.usuario.empresa_id],
       );
 
@@ -805,11 +799,8 @@ router.post(
 
       for (const item of detalle) {
         const cantidad = Number(item.cantidad);
-
         const precio = Number(item.precio);
-
         const descuento = Number(item.descuento || 0);
-
         const stock = Number(item.stock);
 
         if (item.activo !== true || item.tipo !== "PRODUCTO") {
@@ -863,34 +854,34 @@ router.post(
 
       const facturaFinalResult = await client.query(
         `
-          INSERT INTO facturas (
-            fecha,
-            total,
-            cliente_id,
-            caja_id,
-            forma_pago,
-            empresa_id,
-            usuario_id,
-            propina_aplicada,
-            propina,
-            itbis_aplicado,
-            itbis
-          )
-          VALUES (
-            NOW() AT TIME ZONE 'America/Santo_Domingo',
-            $1,
-            NULL,
-            $2,
-            $3,
-            $4,
-            $5,
-            FALSE,
-            0,
-            $6,
-            $7
-          )
-          RETURNING id
-          `,
+        INSERT INTO facturas (
+          fecha,
+          total,
+          cliente_id,
+          caja_id,
+          forma_pago,
+          empresa_id,
+          usuario_id,
+          propina_aplicada,
+          propina,
+          itbis_aplicado,
+          itbis
+        )
+        VALUES (
+          NOW() AT TIME ZONE 'America/Santo_Domingo',
+          $1,
+          NULL,
+          $2,
+          $3,
+          $4,
+          $5,
+          FALSE,
+          0,
+          $6,
+          $7
+        )
+        RETURNING id
+        `,
         [
           total,
           cajaId,
@@ -911,27 +902,27 @@ router.post(
       for (const item of detalle) {
         await client.query(
           `
-          INSERT INTO factura_detalle (
-            factura_id,
-            producto_id,
-            cantidad,
-            precio,
-            descuento,
-            es_servicio,
-            descripcion_manual,
-            costo_manual
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            FALSE,
-            NULL,
-            NULL
-          )
-          `,
+    INSERT INTO factura_detalle (
+      factura_id,
+      producto_id,
+      cantidad,
+      precio,
+      descuento,
+      es_servicio,
+      descripcion_manual,
+      costo_manual
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      FALSE,
+      NULL,
+      NULL
+    )
+    `,
           [
             facturaId,
             item.producto_id,
@@ -947,15 +938,15 @@ router.post(
 
         const stockResult = await client.query(
           `
-            UPDATE productos
-            SET stock = stock - $1
-            WHERE
-              id = $2
-              AND empresa_id = $3
-              AND activo = TRUE
-              AND stock >= $1
-            RETURNING stock
-            `,
+    UPDATE productos
+    SET stock = stock - $1
+    WHERE
+      id = $2
+      AND empresa_id = $3
+      AND activo = TRUE
+      AND stock >= $1
+    RETURNING stock
+    `,
           [item.cantidad, item.producto_id, req.usuario.empresa_id],
         );
 
@@ -971,19 +962,19 @@ router.post(
 
         await client.query(
           `
-          INSERT INTO movimientos (
-            producto_id,
-            tipo,
-            cantidad,
-            fecha
-          )
-          VALUES (
-            $1,
-            'SALIDA',
-            $2,
-            NOW()
-          )
-          `,
+    INSERT INTO movimientos (
+      producto_id,
+      tipo,
+      cantidad,
+      fecha
+    )
+    VALUES (
+      $1,
+      'SALIDA',
+      $2,
+      NOW()
+    )
+    `,
           [item.producto_id, item.cantidad],
         );
       }
@@ -997,14 +988,8 @@ router.post(
           await client.query(
             `
             UPDATE cajas
-            SET
-              efectivo =
-                COALESCE(
-                  efectivo,
-                  0
-                ) + $1
-            WHERE
-              id = $2
+            SET efectivo = COALESCE(efectivo, 0) + $1
+            WHERE id = $2
               AND empresa_id = $3
             `,
             [total, cajaId, req.usuario.empresa_id],
@@ -1015,14 +1000,8 @@ router.post(
           await client.query(
             `
             UPDATE cajas
-            SET
-              tarjeta =
-                COALESCE(
-                  tarjeta,
-                  0
-                ) + $1
-            WHERE
-              id = $2
+            SET tarjeta = COALESCE(tarjeta, 0) + $1
+            WHERE id = $2
               AND empresa_id = $3
             `,
             [total, cajaId, req.usuario.empresa_id],
@@ -1033,14 +1012,8 @@ router.post(
           await client.query(
             `
             UPDATE cajas
-            SET
-              transferencia =
-                COALESCE(
-                  transferencia,
-                  0
-                ) + $1
-            WHERE
-              id = $2
+            SET transferencia = COALESCE(transferencia, 0) + $1
+            WHERE id = $2
               AND empresa_id = $3
             `,
             [total, cajaId, req.usuario.empresa_id],

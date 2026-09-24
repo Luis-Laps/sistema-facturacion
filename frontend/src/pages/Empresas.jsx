@@ -14,6 +14,15 @@ function Empresas() {
   const [empresaEditando, setEmpresaEditando] = useState(null);
 
   // ==========================================
+  // MÓDULOS
+  // ==========================================
+
+  const [modulos, setModulos] = useState([]);
+  const [modulosEmpresa, setModulosEmpresa] = useState([]);
+  const [cargandoModulos, setCargandoModulos] = useState(false);
+  const [guardandoModulo, setGuardandoModulo] = useState(false);
+
+  // ==========================================
   // FORMULARIO
   // ==========================================
 
@@ -26,8 +35,7 @@ function Empresas() {
     logo_url: "",
     color_principal: "#198754",
 
-    //Tipo de empresa
-
+    // Tipo de empresa
     tipo: "ESTANDAR",
 
     // Características
@@ -60,8 +68,61 @@ function Empresas() {
     }
   };
 
+  // ==========================================
+  // CARGAR TODOS LOS MÓDULOS
+  // ==========================================
+
+  const cargarModulos = async () => {
+    try {
+      const response = await api.get("/modulos");
+
+      setModulos(response.data);
+    } catch (error) {
+      console.error("Error al cargar módulos:", error);
+
+      alert(
+        error.response?.data?.mensaje || "No fue posible cargar los módulos.",
+      );
+    }
+  };
+
+  // ==========================================
+  // CARGAR MÓDULOS DE UNA EMPRESA
+  // ==========================================
+
+  const cargarModulosEmpresa = async (empresaId) => {
+    if (!empresaId) {
+      setModulosEmpresa([]);
+      return;
+    }
+
+    try {
+      setCargandoModulos(true);
+
+      const response = await api.get(`/modulos/empresa/${empresaId}`);
+
+      setModulosEmpresa(response.data.modulos || []);
+    } catch (error) {
+      console.error("Error al cargar módulos de la empresa:", error);
+
+      setModulosEmpresa([]);
+
+      alert(
+        error.response?.data?.mensaje ||
+          "No fue posible cargar los módulos de la empresa.",
+      );
+    } finally {
+      setCargandoModulos(false);
+    }
+  };
+
+  // ==========================================
+  // CARGA INICIAL
+  // ==========================================
+
   useEffect(() => {
     cargarEmpresas();
+    cargarModulos();
   }, []);
 
   // ==========================================
@@ -83,6 +144,7 @@ function Empresas() {
 
   const abrirFormulario = () => {
     setEmpresaEditando(null);
+    setModulosEmpresa([]);
 
     setForm({
       nombre: "",
@@ -93,7 +155,6 @@ function Empresas() {
       logo_url: "",
       color_principal: "#198754",
 
-      // Tipo de empresa
       tipo: "ESTANDAR",
 
       propina_ley: false,
@@ -111,7 +172,7 @@ function Empresas() {
   // FORMULARIO EDITAR EMPRESA
   // ==========================================
 
-  const abrirEditar = (empresa) => {
+  const abrirEditar = async (empresa) => {
     setEmpresaEditando(empresa);
 
     setForm({
@@ -123,19 +184,19 @@ function Empresas() {
       logo_url: empresa.logo_url || "",
       color_principal: empresa.color_principal || "#198754",
 
-      // Tipo de empresa
       tipo: empresa.tipo || "ESTANDAR",
 
       propina_ley: empresa.propina_ley === true,
       itbis_ley: empresa.itbis_ley === true,
 
-      // No se modifican desde editar empresa
       admin_nombre: "",
       admin_usuario: "",
       admin_password: "",
     });
 
     setMostrarFormulario(true);
+
+    await cargarModulosEmpresa(empresa.id);
   };
 
   // ==========================================
@@ -143,10 +204,56 @@ function Empresas() {
   // ==========================================
 
   const cerrarFormulario = () => {
-    if (guardando) return;
+    if (guardando || guardandoModulo) return;
 
     setMostrarFormulario(false);
     setEmpresaEditando(null);
+    setModulosEmpresa([]);
+  };
+
+  // ==========================================
+  // VERIFICAR SI UN MÓDULO ESTÁ ASIGNADO
+  // ==========================================
+
+  const moduloAsignado = (codigo) => {
+    const modulo = modulosEmpresa.find((item) => item.codigo === codigo);
+
+    return modulo?.asignado === true;
+  };
+
+  // ==========================================
+  // ASIGNAR / QUITAR MÓDULO
+  // ==========================================
+
+  const cambiarModulo = async (modulo) => {
+    if (!empresaEditando || guardandoModulo) {
+      return;
+    }
+
+    const asignado = moduloAsignado(modulo.codigo);
+
+    try {
+      setGuardandoModulo(true);
+
+      if (asignado) {
+        await api.delete(`/modulos/empresa/${empresaEditando.id}/${modulo.id}`);
+      } else {
+        await api.post(`/modulos/empresa/${empresaEditando.id}/asignar`, {
+          modulo_id: modulo.id,
+        });
+      }
+
+      // Recargar módulos para reflejar el nuevo estado
+      await cargarModulosEmpresa(empresaEditando.id);
+    } catch (error) {
+      console.error("Error al cambiar módulo:", error);
+
+      alert(
+        error.response?.data?.mensaje || "No fue posible modificar el módulo.",
+      );
+    } finally {
+      setGuardandoModulo(false);
+    }
   };
 
   // ==========================================
@@ -203,18 +310,49 @@ function Empresas() {
         });
 
         alert("Empresa actualizada correctamente.");
+
+        // Recargar módulos por si el modal sigue abierto
+        await cargarModulosEmpresa(empresaEditando.id);
       } else {
         // ==========================================
         // CREAR
         // ==========================================
 
-        await api.post("/empresas", form);
+        const response = await api.post("/empresas", form);
+
+        const empresaCreada = response.data?.empresa;
 
         alert("Empresa creada correctamente.");
-      }
 
-      setMostrarFormulario(false);
-      setEmpresaEditando(null);
+        // Si el backend devuelve la empresa creada,
+        // abrimos automáticamente la gestión de módulos.
+        if (empresaCreada?.id) {
+          setEmpresaEditando(empresaCreada);
+
+          setForm({
+            nombre: empresaCreada.nombre || form.nombre,
+            rnc: empresaCreada.rnc || form.rnc,
+            telefono: empresaCreada.telefono || form.telefono,
+            direccion: empresaCreada.direccion || form.direccion,
+            correo: empresaCreada.correo || form.correo,
+            logo_url: empresaCreada.logo_url || form.logo_url,
+            color_principal:
+              empresaCreada.color_principal || form.color_principal,
+            tipo: empresaCreada.tipo || form.tipo,
+            propina_ley: empresaCreada.propina_ley === true,
+            itbis_ley: empresaCreada.itbis_ley === true,
+            admin_nombre: "",
+            admin_usuario: "",
+            admin_password: "",
+          });
+
+          await cargarModulosEmpresa(empresaCreada.id);
+
+          setMostrarFormulario(true);
+        } else {
+          setMostrarFormulario(false);
+        }
+      }
 
       await cargarEmpresas();
     } catch (error) {
@@ -293,7 +431,7 @@ function Empresas() {
         direccion: empresa.direccion,
         correo: empresa.correo,
         logo_url: empresa.logo_url,
-        color_principal: empresa.color_principal,
+        color_principal: empresa.color_principal || "#198754",
         tipo: empresa.tipo || "ESTANDAR",
         propina_ley: empresa.propina_ley === true,
         itbis_ley: empresa.itbis_ley === true,
@@ -462,7 +600,7 @@ function Empresas() {
                     type="button"
                     className="btn-close"
                     onClick={cerrarFormulario}
-                    disabled={guardando}
+                    disabled={guardando || guardandoModulo}
                   ></button>
                 </div>
 
@@ -585,7 +723,7 @@ function Empresas() {
                     {/* TIPO DE EMPRESA */}
 
                     <div className="col-md-12 mb-3">
-                      <label className="form-label">Tipo de empresa *</label>
+                      <label className="form-label">Tipo de empresa</label>
 
                       <select
                         className="form-select"
@@ -595,11 +733,13 @@ function Empresas() {
                         disabled={guardando}
                       >
                         <option value="ESTANDAR">Empresa estándar</option>
+
                         <option value="FERRETERIA">Ferretería</option>
                       </select>
 
                       <div className="form-text">
-                        Define los módulos y el menú que tendrá esta empresa.
+                        Clasificación de la empresa. Los módulos se asignan
+                        independientemente desde la sección de módulos.
                       </div>
                     </div>
                   </div>
@@ -669,12 +809,101 @@ function Empresas() {
                   </div>
 
                   {/* ==========================================
+                      MÓDULOS
+                  ========================================== */}
+
+                  <h6 className="mb-3">Módulos de la empresa</h6>
+
+                  {!empresaEditando ? (
+                    <div className="alert alert-info">
+                      <strong>Empresa nueva</strong>
+
+                      <div className="mt-1">
+                        Primero cree la empresa. Después podrá asignarle los
+                        módulos que tendrá disponibles.
+                      </div>
+                    </div>
+                  ) : cargandoModulos ? (
+                    <div className="text-center py-3">Cargando módulos...</div>
+                  ) : modulos.length === 0 ? (
+                    <div className="alert alert-warning">
+                      No hay módulos disponibles.
+                    </div>
+                  ) : (
+                    <div className="row">
+                      {modulos.map((modulo) => {
+                        const asignado = moduloAsignado(modulo.codigo);
+
+                        return (
+                          <div className="col-md-6 mb-3" key={modulo.id}>
+                            <div
+                              className={`card h-100 ${
+                                asignado ? "border-success" : ""
+                              }`}
+                            >
+                              <div className="card-body">
+                                <div className="form-check">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id={`modulo-${modulo.id}`}
+                                    checked={asignado}
+                                    disabled={guardandoModulo}
+                                    onChange={() => cambiarModulo(modulo)}
+                                  />
+
+                                  <label
+                                    className="form-check-label w-100"
+                                    htmlFor={`modulo-${modulo.id}`}
+                                    style={{
+                                      cursor: guardandoModulo
+                                        ? "default"
+                                        : "pointer",
+                                    }}
+                                  >
+                                    <div className="d-flex align-items-center gap-2">
+                                      <span
+                                        style={{
+                                          fontSize: "1.4rem",
+                                        }}
+                                      >
+                                        {modulo.icono || "📦"}
+                                      </span>
+
+                                      <strong>{modulo.nombre}</strong>
+                                    </div>
+
+                                    {modulo.descripcion && (
+                                      <div className="text-muted small mt-1">
+                                        {modulo.descripcion}
+                                      </div>
+                                    )}
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {empresaEditando && (
+                    <div className="alert alert-secondary mt-2">
+                      <strong>Importante:</strong> los módulos se guardan
+                      inmediatamente al marcar o desmarcar cada opción.
+                    </div>
+                  )}
+
+                  {/* ==========================================
                       ADMINISTRADOR
                       SOLO AL CREAR
                   ========================================== */}
 
                   {!empresaEditando && (
                     <>
+                      <hr />
+
                       <h6 className="mb-3">Administrador de la empresa</h6>
 
                       <div className="row">
@@ -738,9 +967,9 @@ function Empresas() {
                     type="button"
                     className="btn btn-secondary"
                     onClick={cerrarFormulario}
-                    disabled={guardando}
+                    disabled={guardando || guardandoModulo}
                   >
-                    Cancelar
+                    Cerrar
                   </button>
 
                   <button
@@ -749,7 +978,7 @@ function Empresas() {
                       empresaEditando ? "btn btn-primary" : "btn btn-success"
                     }
                     onClick={guardarEmpresa}
-                    disabled={guardando}
+                    disabled={guardando || guardandoModulo}
                   >
                     {guardando
                       ? "Guardando..."

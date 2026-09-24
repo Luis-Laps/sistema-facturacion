@@ -13,40 +13,61 @@ function Navbar() {
   const rol = obtenerRol();
 
   const [empresa, setEmpresa] = useState(null);
+
+  const [modulos, setModulos] = useState([]);
+
   const [menuAbierto, setMenuAbierto] = useState(null);
+
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   // ==========================================
-  // TIPO DE EMPRESA
-  // ==========================================
-
-  const esFerreteria = empresa?.tipo === "FERRETERIA";
-
-  // ==========================================
-  // CARGAR EMPRESA
+  // CARGAR EMPRESA Y MÓDULOS
   // ==========================================
 
   useEffect(() => {
-    // El SUPER_ADMIN no pertenece
-    // a una empresa específica.
-
+    // SUPER ADMIN no pertenece a una empresa
     if (rol === "SUPER_ADMIN") {
       setEmpresa(null);
+      setModulos([]);
       return;
     }
 
-    const cargarEmpresa = async () => {
+    const cargarDatos = async () => {
       try {
-        const response = await api.get("/configuracion");
+        // ==========================================
+        // EMPRESA
+        // ==========================================
 
-        setEmpresa(response.data);
+        const empresaResponse = await api.get("/configuracion");
+
+        setEmpresa(empresaResponse.data);
+
+        // ==========================================
+        // MÓDULOS ASIGNADOS
+        // ==========================================
+
+        const modulosResponse = await api.get("/modulos/mis-modulos");
+
+        setModulos(
+          Array.isArray(modulosResponse.data) ? modulosResponse.data : [],
+        );
       } catch (error) {
-        console.error("Error al cargar empresa:", error);
+        console.error("Error al cargar empresa y módulos:", error);
+
+        setModulos([]);
       }
     };
 
-    cargarEmpresa();
+    cargarDatos();
   }, [rol]);
+
+  // ==========================================
+  // VERIFICAR MÓDULO
+  // ==========================================
+
+  const tieneModulo = (codigo) => {
+    return modulos.some((modulo) => modulo.codigo === codigo);
+  };
 
   // ==========================================
   // CERRAR SESIÓN
@@ -199,155 +220,11 @@ function Navbar() {
           </Link>
 
           {/* ==================================
-              MENÚ FERRETERÍA
+              PRODUCTOS
           ================================== */}
 
-          {esFerreteria ? (
-            <>
-              {/* ==================================
-                  REPORTES
-              ================================== */}
-
-              <button
-                type="button"
-                className={`sidebar-link sidebar-link-button ${
-                  menuAbierto === "reportes" ? "sidebar-link-open" : ""
-                }`}
-                onClick={() => toggleMenu("reportes")}
-              >
-                <span className="sidebar-icon">📊</span>
-
-                <span className="sidebar-link-text">Reportes</span>
-
-                <span className="sidebar-arrow">
-                  {menuAbierto === "reportes" ? "⌃" : "⌄"}
-                </span>
-              </button>
-
-              {menuAbierto === "reportes" && (
-                <div className="sidebar-submenu">
-                  <Link
-                    to="/reportes-caja"
-                    className={`sidebar-sublink ${
-                      estaActivo("/reportes-caja")
-                        ? "sidebar-sublink-active"
-                        : ""
-                    }`}
-                    onClick={() => setSidebarAbierto(false)}
-                  >
-                    Reportes de caja
-                  </Link>
-                </div>
-              )}
-
-              {/* ==================================
-                  FERRETERÍA
-              ================================== */}
-
-              <button
-                type="button"
-                className={`sidebar-link sidebar-link-button ${
-                  menuAbierto === "ferreteria" ? "sidebar-link-open" : ""
-                }`}
-                onClick={() => toggleMenu("ferreteria")}
-              >
-                <span className="sidebar-icon">🔧</span>
-
-                <span className="sidebar-link-text">Ferretería</span>
-
-                <span className="sidebar-arrow">
-                  {menuAbierto === "ferreteria" ? "⌃" : "⌄"}
-                </span>
-              </button>
-
-              {menuAbierto === "ferreteria" && (
-                <div className="sidebar-submenu">
-                  {/* NUEVA FACTURA */}
-
-                  <Link
-                    to="/ferreteria/nueva-factura"
-                    className={`sidebar-sublink ${
-                      estaActivo("/ferreteria/nueva-factura")
-                        ? "sidebar-sublink-active"
-                        : ""
-                    }`}
-                    onClick={() => setSidebarAbierto(false)}
-                  >
-                    Nueva Factura
-                  </Link>
-
-                  {/* FACTURAS ABIERTAS */}
-
-                  <Link
-                    to="/ferreteria/facturas-abiertas"
-                    className={`sidebar-sublink ${
-                      estaActivo("/ferreteria/facturas-abiertas")
-                        ? "sidebar-sublink-active"
-                        : ""
-                    }`}
-                    onClick={() => setSidebarAbierto(false)}
-                  >
-                    Facturas Abiertas
-                  </Link>
-                  {/* HISTORIAL DE FACTURAS */}
-
-                  <Link
-                    to="/ferreteria/historial-facturas"
-                    className={`sidebar-sublink ${
-                      estaActivo("/ferreteria/historial-facturas")
-                        ? "sidebar-sublink-active"
-                        : ""
-                    }`}
-                    onClick={() => setSidebarAbierto(false)}
-                  >
-                    Historial de Facturas
-                  </Link>
-                </div>
-              )}
-
-              {/* ==================================
-                  PROVEEDORES
-                  SOLO ADMIN / SUPER_ADMIN
-              ================================== */}
-
-              {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
-                <Link
-                  to="/proveedores"
-                  className={`sidebar-link ${
-                    estaActivo("/proveedores") ? "sidebar-link-active" : ""
-                  }`}
-                  onClick={() => setSidebarAbierto(false)}
-                >
-                  <span className="sidebar-icon">🚚</span>
-
-                  <span>Proveedores</span>
-                </Link>
-              )}
-
-              {/* ==================================
-                  PRODUCTOS
-              ================================== */}
-
-              {rol !== "CAJERO" && (
-                <Link
-                  to="/productos"
-                  className={`sidebar-link ${
-                    estaActivo("/productos") ? "sidebar-link-active" : ""
-                  }`}
-                  onClick={() => setSidebarAbierto(false)}
-                >
-                  <span className="sidebar-icon">📦</span>
-
-                  <span>Productos</span>
-                </Link>
-              )}
-            </>
-          ) : (
-            <>
-              {/* ==================================
-                  PRODUCTOS
-              ================================== */}
-
+          {tieneModulo("PRODUCTOS") &&
+            (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
               <Link
                 to="/productos"
                 className={`sidebar-link ${
@@ -359,11 +236,33 @@ function Navbar() {
 
                 <span>Productos</span>
               </Link>
+            )}
 
-              {/* ==================================
-                  CLIENTES
-              ================================== */}
+          {/* ==================================
+              INVENTARIO
+          ================================== */}
 
+          {tieneModulo("INVENTARIO") &&
+            (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+              <Link
+                to="/inventario"
+                className={`sidebar-link ${
+                  estaActivo("/inventario") ? "sidebar-link-active" : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                <span className="sidebar-icon">📊</span>
+
+                <span>Inventario</span>
+              </Link>
+            )}
+
+          {/* ==================================
+              CLIENTES
+          ================================== */}
+
+          {tieneModulo("CLIENTES") &&
+            (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
               <Link
                 to="/clientes"
                 className={`sidebar-link ${
@@ -375,30 +274,51 @@ function Navbar() {
 
                 <span>Clientes</span>
               </Link>
+            )}
 
-              {/* ==================================
-                  CONTROL DE ORDEN
-                  SOLO EMPRESAS CON MESAS
-              ================================== */}
+          {/* ==================================
+              PROVEEDORES
+          ================================== */}
 
-              {empresa?.manejo_mesas === true && (
-                <Link
-                  to="/control-orden"
-                  className={`sidebar-link ${
-                    estaActivo("/control-orden") ? "sidebar-link-active" : ""
-                  }`}
-                  onClick={() => setSidebarAbierto(false)}
-                >
-                  <span className="sidebar-icon">🍽️</span>
+          {tieneModulo("PROVEEDORES") &&
+            (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+              <Link
+                to="/proveedores"
+                className={`sidebar-link ${
+                  estaActivo("/proveedores") ? "sidebar-link-active" : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                <span className="sidebar-icon">🚚</span>
 
-                  <span>Control de Orden</span>
-                </Link>
-              )}
+                <span>Proveedores</span>
+              </Link>
+            )}
 
-              {/* ==================================
-                  FACTURACIÓN
-              ================================== */}
+          {/* ==================================
+              CONTROL DE ORDEN
+          ================================== */}
 
+          {tieneModulo("CONTROL_ORDEN") && (
+            <Link
+              to="/control-orden"
+              className={`sidebar-link ${
+                estaActivo("/control-orden") ? "sidebar-link-active" : ""
+              }`}
+              onClick={() => setSidebarAbierto(false)}
+            >
+              <span className="sidebar-icon">🍽️</span>
+
+              <span>Control de Orden</span>
+            </Link>
+          )}
+
+          {/* ==================================
+              FACTURACIÓN
+          ================================== */}
+
+          {tieneModulo("FACTURACION") && (
+            <>
               <button
                 type="button"
                 className={`sidebar-link sidebar-link-button ${
@@ -450,51 +370,116 @@ function Navbar() {
                   </Link>
                 </div>
               )}
-
-              {/* ==================================
-                  REPORTES
-              ================================== */}
-
-              <button
-                type="button"
-                className={`sidebar-link sidebar-link-button ${
-                  menuAbierto === "reportes" ? "sidebar-link-open" : ""
-                }`}
-                onClick={() => toggleMenu("reportes")}
-              >
-                <span className="sidebar-icon">📊</span>
-
-                <span className="sidebar-link-text">Reportes</span>
-
-                <span className="sidebar-arrow">
-                  {menuAbierto === "reportes" ? "⌃" : "⌄"}
-                </span>
-              </button>
-
-              {menuAbierto === "reportes" && (
-                <div className="sidebar-submenu">
-                  <Link
-                    to="/reportes-caja"
-                    className={`sidebar-sublink ${
-                      estaActivo("/reportes-caja")
-                        ? "sidebar-sublink-active"
-                        : ""
-                    }`}
-                    onClick={() => setSidebarAbierto(false)}
-                  >
-                    Reportes de caja
-                  </Link>
-                </div>
-              )}
             </>
           )}
 
           {/* ==================================
-              ADMINISTRACIÓN
-              SOLO EMPRESA ESTÁNDAR
+              FERRETERÍA
           ================================== */}
 
-          {!esFerreteria && rol === "ADMIN" && (
+          {tieneModulo("FERRETERIA") && (
+            <button
+              type="button"
+              className={`sidebar-link sidebar-link-button ${
+                menuAbierto === "ferreteria" ? "sidebar-link-open" : ""
+              }`}
+              onClick={() => toggleMenu("ferreteria")}
+            >
+              <span className="sidebar-icon">🔧</span>
+
+              <span className="sidebar-link-text">Ferretería</span>
+
+              <span className="sidebar-arrow">
+                {menuAbierto === "ferreteria" ? "⌃" : "⌄"}
+              </span>
+            </button>
+          )}
+
+          {tieneModulo("FERRETERIA") && menuAbierto === "ferreteria" && (
+            <div className="sidebar-submenu">
+              <Link
+                to="/ferreteria/nueva-factura"
+                className={`sidebar-sublink ${
+                  estaActivo("/ferreteria/nueva-factura")
+                    ? "sidebar-sublink-active"
+                    : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                Nueva factura
+              </Link>
+
+              <Link
+                to="/ferreteria/facturas-abiertas"
+                className={`sidebar-sublink ${
+                  estaActivo("/ferreteria/facturas-abiertas")
+                    ? "sidebar-sublink-active"
+                    : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                Facturas abiertas
+              </Link>
+              <Link
+                to="/ferreteria/historial-facturas"
+                className={`sidebar-sublink ${
+                  estaActivo("/ferreteria/historial-facturas")
+                    ? "sidebar-sublink-active"
+                    : ""
+                }`}
+                onClick={() => setSidebarAbierto(false)}
+              >
+                Historial
+              </Link>
+            </div>
+          )}
+
+          {/* ==================================
+              REPORTES
+          ================================== */}
+
+          {tieneModulo("REPORTES") &&
+            (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+              <>
+                <button
+                  type="button"
+                  className={`sidebar-link sidebar-link-button ${
+                    menuAbierto === "reportes" ? "sidebar-link-open" : ""
+                  }`}
+                  onClick={() => toggleMenu("reportes")}
+                >
+                  <span className="sidebar-icon">📈</span>
+
+                  <span className="sidebar-link-text">Reportes</span>
+
+                  <span className="sidebar-arrow">
+                    {menuAbierto === "reportes" ? "⌃" : "⌄"}
+                  </span>
+                </button>
+
+                {menuAbierto === "reportes" && (
+                  <div className="sidebar-submenu">
+                    <Link
+                      to="/reportes-caja"
+                      className={`sidebar-sublink ${
+                        estaActivo("/reportes-caja")
+                          ? "sidebar-sublink-active"
+                          : ""
+                      }`}
+                      onClick={() => setSidebarAbierto(false)}
+                    >
+                      Reportes de caja
+                    </Link>
+                  </div>
+                )}
+              </>
+            )}
+
+          {/* ==================================
+              ADMINISTRACIÓN
+          ================================== */}
+
+          {rol === "ADMIN" && (
             <>
               <div className="sidebar-section-title sidebar-section-margin">
                 ADMINISTRACIÓN

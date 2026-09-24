@@ -17,6 +17,8 @@ import ControlOrden from "./pages/ControlOrden";
 import MesaOrden from "./pages/MesaOrden";
 import ImprimirCuentaPendiente from "./pages/ImprimirCuentaPendiente";
 import ImprimirCierreCaja from "./pages/ImprimirCierreCaja";
+import ImprimirFacturaAbierta from "./components/ImprimirFacturaAbierta";
+import Inventario from "./pages/Inventario";
 
 // ==========================================
 // FERRETERÍA
@@ -113,6 +115,12 @@ function App() {
                     path="/ferreteria/historial-facturas"
                     element={<FerreteriaHistorialFacturas />}
                   />
+
+                  <Route
+                    path="/ferreteria/facturas-abiertas/:id/imprimir"
+                    element={<ImprimirFacturaAbierta />}
+                  />
+                  <Route path="/inventario" element={<Inventario />} />
 
                   {/* ==================================
                       REPORTES

@@ -21,6 +21,10 @@ function FerreteriaFacturaAbierta() {
   const [nombreCliente, setNombreCliente] = useState("");
   const [nota, setNota] = useState("");
 
+  // Tipo de factura abierta:
+  // ABIERTA | PENDIENTE_PAGO | PENDIENTE_ENTREGA
+  const [tipoFactura, setTipoFactura] = useState("ABIERTA");
+
   const [aplicarItbis, setAplicarItbis] = useState(false);
   const [itbisHabilitado, setItbisHabilitado] = useState(false);
 
@@ -59,6 +63,8 @@ function FerreteriaFacturaAbierta() {
       setNombreCliente(response.data.factura?.nombre_cliente || "");
 
       setNota(response.data.factura?.nota || "");
+
+      setTipoFactura(response.data.factura?.tipo || "ABIERTA");
 
       setAplicarItbis(response.data.factura?.itbis_aplicado === true);
     } catch (error) {
@@ -279,6 +285,7 @@ function FerreteriaFacturaAbierta() {
       const response = await api.put(`/ferreteria-abiertas/${id}`, {
         nombre_cliente: nombreCliente.trim() || null,
         nota: nota.trim() || null,
+        tipo: tipoFactura,
         itbis_aplicado: aplicarItbis,
         productos: detalle.map((item) => ({
           producto_id: item.producto_id,
@@ -353,6 +360,7 @@ function FerreteriaFacturaAbierta() {
       await api.put(`/ferreteria-abiertas/${id}`, {
         nombre_cliente: nombreCliente.trim() || null,
         nota: nota.trim() || null,
+        tipo: tipoFactura,
         itbis_aplicado: aplicarItbis,
         productos: detalle.map((item) => ({
           producto_id: item.producto_id,
@@ -697,6 +705,27 @@ function FerreteriaFacturaAbierta() {
                   value={nota}
                   onChange={(e) => setNota(e.target.value)}
                 />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label">Tipo de factura abierta</label>
+
+                <select
+                  className="form-select"
+                  value={tipoFactura}
+                  onChange={(e) => setTipoFactura(e.target.value)}
+                  disabled={procesando}
+                >
+                  <option value="PENDIENTE_PAGO">🟡 Pendiente de pago</option>
+                  <option value="PENDIENTE_ENTREGA">
+                    🔵 Pendiente de entrega
+                  </option>
+                  <option value="ABIERTA">⚪ Abierta</option>
+                </select>
+
+                <small className="text-muted">
+                  Puedes cambiar el tipo mientras la factura permanezca abierta.
+                </small>
               </div>
 
               <div className="mb-3">

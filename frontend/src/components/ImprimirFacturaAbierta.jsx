@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
-import "../styles/ticket.css";
 import api from "../services/api";
+import "../styles/ticket.css";
 
-function ImprimirFacturaTicket() {
+function ImprimirFacturaAbierta() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
 
-  const esCopia = searchParams.get("copia") === "1";
   const [factura, setFactura] = useState(null);
   const [empresa, setEmpresa] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -17,6 +15,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // PREPARAR MODO IMPRESIÓN
   // ==========================================
+
   useEffect(() => {
     document.body.classList.add("ticket-printing");
 
@@ -28,6 +27,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // CARGAR DATOS
   // ==========================================
+
   useEffect(() => {
     const cargarDatos = async () => {
       try {
@@ -35,17 +35,18 @@ function ImprimirFacturaTicket() {
         setError("");
 
         const [facturaRes, empresaRes] = await Promise.all([
-          api.get(`/facturas/${id}`),
+          api.get(`/ferreteria-abiertas/${id}`),
           api.get("/configuracion"),
         ]);
 
         setFactura(facturaRes.data);
         setEmpresa(empresaRes.data);
       } catch (error) {
-        console.error("Error al cargar datos del ticket:", error);
+        console.error("Error al cargar factura abierta:", error);
 
         setError(
-          error.response?.data?.mensaje || "No se pudo cargar la factura.",
+          error.response?.data?.mensaje ||
+            "No se pudo cargar la factura abierta.",
         );
       } finally {
         setCargando(false);
@@ -58,6 +59,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // HELPERS
   // ==========================================
+
   const formatearMoneda = (valor) => {
     return Number(valor || 0).toLocaleString("es-DO", {
       minimumFractionDigits: 2,
@@ -80,8 +82,26 @@ function ImprimirFacturaTicket() {
   };
 
   // ==========================================
-  // ESTADOS DE CARGA
+  // TIPO DE FACTURA
   // ==========================================
+
+  const obtenerTipoFactura = (tipo) => {
+    switch (tipo) {
+      case "PENDIENTE_PAGO":
+        return "PENDIENTE DE PAGO";
+
+      case "PENDIENTE_ENTREGA":
+        return "PENDIENTE DE ENTREGA";
+
+      default:
+        return "ABIERTA";
+    }
+  };
+
+  // ==========================================
+  // CARGANDO
+  // ==========================================
+
   if (cargando) {
     return (
       <div className="ticket-loading-screen">
@@ -89,6 +109,10 @@ function ImprimirFacturaTicket() {
       </div>
     );
   }
+
+  // ==========================================
+  // ERROR
+  // ==========================================
 
   if (error) {
     return (
@@ -111,39 +135,31 @@ function ImprimirFacturaTicket() {
 
   const colorPrincipal = empresa.color_principal || "#198754";
 
+  const tipoFactura = obtenerTipoFactura(datosFactura.tipo);
+
   // ==========================================
-  // DATOS GUARDADOS EN LA FACTURA
+  // TOTALES
   // ==========================================
 
-  // Cada detalle ya representa su subtotal de línea.
-  // No recalculamos descuentos generales ni impuestos
-  // a partir de parámetros externos: imprimimos lo que
-  // realmente quedó guardado en la factura.
   const subtotalProductos = detalle.reduce(
     (total, item) => total + Number(item.subtotal || 0),
     0,
   );
 
   const descuento = Number(datosFactura.descuento || 0);
-  const descuentoTipo = datosFactura.descuento_tipo || null;
+
+  const itbis = Number(datosFactura.itbis || 0);
+
+  const total = Number(datosFactura.total || 0);
 
   const subtotalConDescuento = Math.max(0, subtotalProductos - descuento);
 
-  const propina = Number(datosFactura.propina || 0);
-  const itbis = Number(datosFactura.itbis || 0);
-  const total = Number(datosFactura.total || 0);
-
-  const mostrarDescuento = descuento > 0 || Boolean(descuentoTipo);
-
-  const nombreFormaPago = {
-    EFECTIVO: "💵 Efectivo",
-    TARJETA: "💳 Tarjeta",
-    TRANSFERENCIA: "🏦 Transferencia",
-  };
-
   return (
     <>
-      {/* BOTÓN SOLO PARA PANTALLA */}
+      {/* ==========================================
+          BOTÓN IMPRIMIR
+      ========================================== */}
+
       <div className="ticket-toolbar no-print">
         <button
           type="button"
@@ -154,17 +170,21 @@ function ImprimirFacturaTicket() {
         </button>
       </div>
 
-      {/* TICKET */}
+      {/* ==========================================
+          TICKET
+      ========================================== */}
+
       <main
         className="ticket-page"
         style={{
           "--color-principal": colorPrincipal,
         }}
       >
-        <section className="ticket" aria-label="Factura">
+        <section className="ticket" aria-label="Factura abierta">
           {/* ======================================
               EMPRESA
           ====================================== */}
+
           <header className="empresa">
             {empresa.logo_url && (
               <img
@@ -180,43 +200,40 @@ function ImprimirFacturaTicket() {
             <h2>{empresa.nombre}</h2>
 
             {empresa.rnc && <p>RNC: {empresa.rnc}</p>}
+
             {empresa.direccion && <p>{empresa.direccion}</p>}
+
             {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
+
             {empresa.correo && <p>{empresa.correo}</p>}
           </header>
 
           <div className="ticket-separator" />
 
+          {/* ======================================
+              ENCABEZADO
+          ====================================== */}
+
           <div className="ticket-heading">
             <h3>FACTURA</h3>
 
-            {esCopia && (
-              <div
-                className="ticket-copia"
-                style={{
-                  fontSize: "18px",
-                  fontWeight: "800",
-                  textAlign: "center",
-                  marginTop: "4px",
-                  marginBottom: "6px",
-                  letterSpacing: "2px",
-                }}
-              >
-                COPIA
-              </div>
-            )}
-
-            <p className="cajero">
-              Cajero:{" "}
-              {datosFactura.usuario_nombre ||
-                datosFactura.usuario ||
-                "No identificado"}
-            </p>
+            <div
+              style={{
+                marginTop: "8px",
+                fontWeight: "bold",
+                fontSize: "18px",
+              }}
+            >
+              {tipoFactura}
+            </div>
           </div>
+
+          <div className="ticket-separator" />
 
           {/* ======================================
               INFORMACIÓN
           ====================================== */}
+
           <section className="info-ticket">
             <div className="fila">
               <span>No. Factura</span>
@@ -225,13 +242,24 @@ function ImprimirFacturaTicket() {
 
             <div className="fila">
               <span>Cliente</span>
-              <span>{datosFactura.cliente || "Consumidor final"}</span>
+              <span>{datosFactura.nombre_cliente || "Consumidor final"}</span>
             </div>
 
             <div className="fila">
               <span>Fecha</span>
-              <span>{formatearFecha(datosFactura.fecha)}</span>
+              <span>
+                {formatearFecha(
+                  datosFactura.created_at || datosFactura.updated_at,
+                )}
+              </span>
             </div>
+
+            {datosFactura.usuario_nombre && (
+              <div className="fila">
+                <span>Vendedor</span>
+                <span>{datosFactura.usuario_nombre}</span>
+              </div>
+            )}
           </section>
 
           <div className="ticket-separator" />
@@ -239,18 +267,20 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               DETALLE
           ====================================== */}
+
           <section className="ticket-items">
             {detalle.map((item, index) => {
               const cantidad = Number(item.cantidad || 0);
+
               const precio = Number(item.precio || 0);
+
               const descuentoItem = Number(item.descuento || 0);
+
               const subtotalItem = Number(item.subtotal || 0);
 
               return (
                 <div className="item" key={item.id || index}>
-                  <div className="producto">
-                    {item.nombre || item.descripcion_manual || "Producto"}
-                  </div>
+                  <div className="producto">{item.nombre || "Producto"}</div>
 
                   <div className="detalle-producto">
                     <span>
@@ -263,6 +293,7 @@ function ImprimirFacturaTicket() {
                   {descuentoItem > 0 && (
                     <div className="detalle-producto descuento-linea">
                       <span>Descuento producto</span>
+
                       <span>- RD$ {formatearMoneda(descuentoItem)}</span>
                     </div>
                   )}
@@ -276,25 +307,25 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               RESUMEN
           ====================================== */}
+
           <section className="resumen-ticket">
             <div className="fila">
               <span>Subtotal</span>
+
               <span>RD$ {formatearMoneda(subtotalProductos)}</span>
             </div>
 
-            {mostrarDescuento && descuento > 0 && (
+            {descuento > 0 && (
               <>
                 <div className="fila fila-descuento">
-                  <span>
-                    Descuento
-                    {descuentoTipo ? ` (${descuentoTipo})` : ""}
-                  </span>
+                  <span>Descuento</span>
 
                   <span>- RD$ {formatearMoneda(descuento)}</span>
                 </div>
 
                 <div className="fila">
                   <span>Subtotal con descuento</span>
+
                   <span>RD$ {formatearMoneda(subtotalConDescuento)}</span>
                 </div>
               </>
@@ -303,14 +334,8 @@ function ImprimirFacturaTicket() {
             {datosFactura.itbis_aplicado && itbis > 0 && (
               <div className="fila">
                 <span>ITBIS (18%)</span>
-                <span>RD$ {formatearMoneda(itbis)}</span>
-              </div>
-            )}
 
-            {datosFactura.propina_aplicada && propina > 0 && (
-              <div className="fila">
-                <span>Propina de ley (10%)</span>
-                <span>RD$ {formatearMoneda(propina)}</span>
+                <span>RD$ {formatearMoneda(itbis)}</span>
               </div>
             )}
           </section>
@@ -318,10 +343,16 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               TOTAL
           ====================================== */}
+
           <section className="total">
             <div className="titulo-total">TOTAL</div>
 
-            <div className="monto-total" style={{ color: colorPrincipal }}>
+            <div
+              className="monto-total"
+              style={{
+                color: colorPrincipal,
+              }}
+            >
               RD$ {formatearMoneda(total)}
             </div>
           </section>
@@ -329,27 +360,30 @@ function ImprimirFacturaTicket() {
           <div className="ticket-separator" />
 
           {/* ======================================
-              FORMA DE PAGO
+              ESTADO
           ====================================== */}
-          <div className="fila forma-pago">
-            <strong>Forma de pago</strong>
 
-            <span>
-              {nombreFormaPago[datosFactura.forma_pago] ||
-                datosFactura.forma_pago ||
-                "No especificada"}
-            </span>
-          </div>
+          <section
+            style={{
+              textAlign: "center",
+              margin: "15px 0",
+              fontWeight: "bold",
+              fontSize: "17px",
+            }}
+          >
+            {tipoFactura}
+          </section>
 
           <div className="ticket-separator" />
 
           {/* ======================================
               PIE
           ====================================== */}
-          <footer className="footer">
-            <strong>¡Gracias por su compra!</strong>
 
-            <div>Esperamos verle nuevamente.</div>
+          <footer className="footer">
+            <strong>Documento pendiente de cobro</strong>
+
+            <div>Esta factura todavía no ha sido cobrada.</div>
 
             <div className="footer-empresa">
               <strong>{empresa.nombre}</strong>
@@ -365,4 +399,4 @@ function ImprimirFacturaTicket() {
   );
 }
 
-export default ImprimirFacturaTicket;
+export default ImprimirFacturaAbierta;
