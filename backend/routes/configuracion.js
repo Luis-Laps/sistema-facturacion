@@ -32,6 +32,7 @@ router.get("/", validarToken, async (req, res) => {
       SELECT
         id,
         nombre,
+        slogan,
         rnc,
         telefono,
         direccion,
@@ -75,6 +76,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
   try {
     const {
       nombre,
+      slogan,
       rnc,
       telefono,
       direccion,
@@ -104,18 +106,20 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
       UPDATE empresas
       SET
         nombre = $1,
-        rnc = $2,
-        telefono = $3,
-        direccion = $4,
-        correo = $5,
-        logo_url = $6,
-        color_principal = $7,
-        propina_ley = $8,
-        itbis_ley = $9
-      WHERE id = $10
+        slogan = $2,
+        rnc = $3,
+        telefono = $4,
+        direccion = $5,
+        correo = $6,
+        logo_url = $7,
+        color_principal = $8,
+        propina_ley = $9,
+        itbis_ley = $10
+      WHERE id = $11
       RETURNING
         id,
         nombre,
+        slogan,
         rnc,
         telefono,
         direccion,
@@ -131,6 +135,7 @@ router.put("/", validarToken, validarAdmin, async (req, res) => {
       `,
       [
         nombre.trim(),
+        slogan ? slogan.trim() : null,
         rnc || null,
         telefono || null,
         direccion || null,

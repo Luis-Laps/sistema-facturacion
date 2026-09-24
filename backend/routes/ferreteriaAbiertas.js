@@ -60,6 +60,7 @@ router.get("/", validarToken, validarFerreteria, async (req, res) => {
         fa.empresa_id,
         fa.usuario_id,
         fa.nombre_cliente,
+        fa.direccion_cliente,
         fa.nota,
         fa.estado,
         fa.tipo,
@@ -109,6 +110,7 @@ router.get("/:id", validarToken, validarFerreteria, async (req, res) => {
         fa.empresa_id,
         fa.usuario_id,
         fa.nombre_cliente,
+        fa.direccion_cliente,
         fa.nota,
         fa.estado,
         fa.tipo,
@@ -190,6 +192,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
 
     const {
       nombre_cliente = "",
+      direccion_cliente = "",
       nota = "",
       productos,
       itbis_aplicado = false,
@@ -208,6 +211,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
 
     let subtotal = 0;
     let descuentoTotal = 0;
+
     const detalleValidado = [];
 
     for (const item of productos) {
@@ -287,6 +291,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
     }
 
     subtotal = Math.round((subtotal + Number.EPSILON) * 100) / 100;
+
     descuentoTotal = Math.round((descuentoTotal + Number.EPSILON) * 100) / 100;
 
     let aplicarItbis = false;
@@ -298,6 +303,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
       }
 
       aplicarItbis = true;
+
       itbis = Math.round((subtotal * 0.18 + Number.EPSILON) * 100) / 100;
     }
 
@@ -309,6 +315,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
         empresa_id,
         usuario_id,
         nombre_cliente,
+        direccion_cliente,
         nota,
         estado,
         tipo,
@@ -325,13 +332,14 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
         $2,
         $3,
         $4,
-        'ABIERTA',
         $5,
+        'ABIERTA',
         $6,
         $7,
         $8,
         $9,
         $10,
+        $11,
         NOW(),
         NOW()
       )
@@ -341,6 +349,7 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
         req.usuario.empresa_id,
         req.usuario.id,
         nombre_cliente?.trim() || null,
+        direccion_cliente?.trim() || null,
         nota?.trim() || null,
         tipo,
         subtotal,
@@ -403,7 +412,9 @@ router.post("/", validarToken, validarFerreteria, async (req, res) => {
   } finally {
     client.release();
   }
-}); // ==========================================
+});
+
+// ==========================================
 // ACTUALIZAR FACTURA ABIERTA
 // ==========================================
 
@@ -417,6 +428,7 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     const {
       nombre_cliente = "",
+      direccion_cliente = "",
       nota = "",
       productos,
       itbis_aplicado = false,
@@ -425,7 +437,9 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     const facturaResult = await client.query(
       `
-      SELECT id, estado
+      SELECT
+        id,
+        estado
       FROM facturas_abiertas
       WHERE
         id = $1
@@ -455,6 +469,7 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
 
     let subtotal = 0;
     let descuentoTotal = 0;
+
     const detalleValidado = [];
 
     for (const item of productos) {
@@ -593,21 +608,23 @@ router.put("/:id", validarToken, validarFerreteria, async (req, res) => {
       UPDATE facturas_abiertas
       SET
         nombre_cliente = $1,
-        nota = $2,
-        tipo = $3,
-        subtotal = $4,
-        descuento = $5,
-        itbis_aplicado = $6,
-        itbis = $7,
-        total = $8,
+        direccion_cliente = $2,
+        nota = $3,
+        tipo = $4,
+        subtotal = $5,
+        descuento = $6,
+        itbis_aplicado = $7,
+        itbis = $8,
+        total = $9,
         updated_at = NOW()
       WHERE
-        id = $9
-        AND empresa_id = $10
+        id = $10
+        AND empresa_id = $11
       RETURNING *
       `,
       [
         nombre_cliente?.trim() || null,
+        direccion_cliente?.trim() || null,
         nota?.trim() || null,
         tipo,
         subtotal,
@@ -799,8 +816,11 @@ router.post(
 
       for (const item of detalle) {
         const cantidad = Number(item.cantidad);
+
         const precio = Number(item.precio);
+
         const descuento = Number(item.descuento || 0);
+
         const stock = Number(item.stock);
 
         if (item.activo !== true || item.tipo !== "PRODUCTO") {
@@ -849,41 +869,64 @@ router.post(
       const total = Math.round((subtotal + itbis + Number.EPSILON) * 100) / 100;
 
       // ==========================================
+      // OBTENER NÚMERO DE FACTURA POR EMPRESA
+      // ==========================================
+
+      const numeroFacturaResult = await client.query(
+        `
+          SELECT obtener_siguiente_numero_factura($1) AS numero_factura
+          `,
+        [req.usuario.empresa_id],
+      );
+
+      const numeroFactura = numeroFacturaResult.rows[0].numero_factura;
+
+      if (!numeroFactura) {
+        throw new Error("No fue posible generar el número de factura.");
+      }
+
+      // ==========================================
       // CREAR FACTURA DEFINITIVA
       // ==========================================
 
       const facturaFinalResult = await client.query(
         `
-        INSERT INTO facturas (
-          fecha,
-          total,
-          cliente_id,
-          caja_id,
-          forma_pago,
-          empresa_id,
-          usuario_id,
-          propina_aplicada,
-          propina,
-          itbis_aplicado,
-          itbis
-        )
-        VALUES (
-          NOW() AT TIME ZONE 'America/Santo_Domingo',
-          $1,
-          NULL,
-          $2,
-          $3,
-          $4,
-          $5,
-          FALSE,
-          0,
-          $6,
-          $7
-        )
-        RETURNING id
-        `,
+          INSERT INTO facturas (
+            numero_factura,
+            fecha,
+            total,
+            cliente_id,
+            direccion_cliente,
+            caja_id,
+            forma_pago,
+            empresa_id,
+            usuario_id,
+            propina_aplicada,
+            propina,
+            itbis_aplicado,
+            itbis
+          )
+          VALUES (
+            $1,
+            NOW() AT TIME ZONE 'America/Santo_Domingo',
+            $2,
+            NULL,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            FALSE,
+            0,
+            $8,
+            $9
+          )
+          RETURNING id, numero_factura
+          `,
         [
+          numeroFactura,
           total,
+          facturaAbierta.direccion_cliente || null,
           cajaId,
           forma_pago,
           req.usuario.empresa_id,
@@ -895,6 +938,8 @@ router.post(
 
       const facturaId = facturaFinalResult.rows[0].id;
 
+      const numeroFacturaFinal = facturaFinalResult.rows[0].numero_factura;
+
       // ==========================================
       // CREAR DETALLE DEFINITIVO
       // ==========================================
@@ -902,27 +947,27 @@ router.post(
       for (const item of detalle) {
         await client.query(
           `
-    INSERT INTO factura_detalle (
-      factura_id,
-      producto_id,
-      cantidad,
-      precio,
-      descuento,
-      es_servicio,
-      descripcion_manual,
-      costo_manual
-    )
-    VALUES (
-      $1,
-      $2,
-      $3,
-      $4,
-      $5,
-      FALSE,
-      NULL,
-      NULL
-    )
-    `,
+          INSERT INTO factura_detalle (
+            factura_id,
+            producto_id,
+            cantidad,
+            precio,
+            descuento,
+            es_servicio,
+            descripcion_manual,
+            costo_manual
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            FALSE,
+            NULL,
+            NULL
+          )
+          `,
           [
             facturaId,
             item.producto_id,
@@ -938,15 +983,15 @@ router.post(
 
         const stockResult = await client.query(
           `
-    UPDATE productos
-    SET stock = stock - $1
-    WHERE
-      id = $2
-      AND empresa_id = $3
-      AND activo = TRUE
-      AND stock >= $1
-    RETURNING stock
-    `,
+            UPDATE productos
+            SET stock = stock - $1
+            WHERE
+              id = $2
+              AND empresa_id = $3
+              AND activo = TRUE
+              AND stock >= $1
+            RETURNING stock
+            `,
           [item.cantidad, item.producto_id, req.usuario.empresa_id],
         );
 
@@ -962,19 +1007,19 @@ router.post(
 
         await client.query(
           `
-    INSERT INTO movimientos (
-      producto_id,
-      tipo,
-      cantidad,
-      fecha
-    )
-    VALUES (
-      $1,
-      'SALIDA',
-      $2,
-      NOW()
-    )
-    `,
+          INSERT INTO movimientos (
+            producto_id,
+            tipo,
+            cantidad,
+            fecha
+          )
+          VALUES (
+            $1,
+            'SALIDA',
+            $2,
+            NOW()
+          )
+          `,
           [item.producto_id, item.cantidad],
         );
       }
@@ -988,8 +1033,11 @@ router.post(
           await client.query(
             `
             UPDATE cajas
-            SET efectivo = COALESCE(efectivo, 0) + $1
-            WHERE id = $2
+            SET
+              efectivo =
+                COALESCE(efectivo, 0) + $1
+            WHERE
+              id = $2
               AND empresa_id = $3
             `,
             [total, cajaId, req.usuario.empresa_id],
@@ -1000,8 +1048,11 @@ router.post(
           await client.query(
             `
             UPDATE cajas
-            SET tarjeta = COALESCE(tarjeta, 0) + $1
-            WHERE id = $2
+            SET
+              tarjeta =
+                COALESCE(tarjeta, 0) + $1
+            WHERE
+              id = $2
               AND empresa_id = $3
             `,
             [total, cajaId, req.usuario.empresa_id],
@@ -1012,8 +1063,11 @@ router.post(
           await client.query(
             `
             UPDATE cajas
-            SET transferencia = COALESCE(transferencia, 0) + $1
-            WHERE id = $2
+            SET
+              transferencia =
+                COALESCE(transferencia, 0) + $1
+            WHERE
+              id = $2
               AND empresa_id = $3
             `,
             [total, cajaId, req.usuario.empresa_id],
@@ -1047,6 +1101,7 @@ router.post(
       res.status(201).json({
         mensaje: "Factura cobrada correctamente.",
         factura_id: facturaId,
+        numero_factura: numeroFacturaFinal,
         factura_abierta_id: Number(id),
         subtotal,
         itbis_aplicado: facturaAbierta.itbis_aplicado === true,

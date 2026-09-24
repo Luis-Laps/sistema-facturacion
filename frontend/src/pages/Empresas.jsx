@@ -28,6 +28,7 @@ function Empresas() {
 
   const [form, setForm] = useState({
     nombre: "",
+    slogan: "",
     rnc: "",
     telefono: "",
     direccion: "",
@@ -148,6 +149,7 @@ function Empresas() {
 
     setForm({
       nombre: "",
+      slogan: "",
       rnc: "",
       telefono: "",
       direccion: "",
@@ -177,6 +179,7 @@ function Empresas() {
 
     setForm({
       nombre: empresa.nombre || "",
+      slogan: empresa.slogan || "",
       rnc: empresa.rnc || "",
       telefono: empresa.telefono || "",
       direccion: empresa.direccion || "",
@@ -243,7 +246,6 @@ function Empresas() {
         });
       }
 
-      // Recargar módulos para reflejar el nuevo estado
       await cargarModulosEmpresa(empresaEditando.id);
     } catch (error) {
       console.error("Error al cambiar módulo:", error);
@@ -298,6 +300,7 @@ function Empresas() {
       if (empresaEditando) {
         await api.put(`/empresas/${empresaEditando.id}`, {
           nombre: form.nombre,
+          slogan: form.slogan,
           rnc: form.rnc,
           telefono: form.telefono,
           direccion: form.direccion,
@@ -311,7 +314,6 @@ function Empresas() {
 
         alert("Empresa actualizada correctamente.");
 
-        // Recargar módulos por si el modal sigue abierto
         await cargarModulosEmpresa(empresaEditando.id);
       } else {
         // ==========================================
@@ -324,23 +326,33 @@ function Empresas() {
 
         alert("Empresa creada correctamente.");
 
-        // Si el backend devuelve la empresa creada,
-        // abrimos automáticamente la gestión de módulos.
         if (empresaCreada?.id) {
           setEmpresaEditando(empresaCreada);
 
           setForm({
             nombre: empresaCreada.nombre || form.nombre,
+
+            slogan: empresaCreada.slogan || form.slogan,
+
             rnc: empresaCreada.rnc || form.rnc,
+
             telefono: empresaCreada.telefono || form.telefono,
+
             direccion: empresaCreada.direccion || form.direccion,
+
             correo: empresaCreada.correo || form.correo,
+
             logo_url: empresaCreada.logo_url || form.logo_url,
+
             color_principal:
               empresaCreada.color_principal || form.color_principal,
+
             tipo: empresaCreada.tipo || form.tipo,
+
             propina_ley: empresaCreada.propina_ley === true,
+
             itbis_ley: empresaCreada.itbis_ley === true,
+
             admin_nombre: "",
             admin_usuario: "",
             admin_password: "",
@@ -426,6 +438,7 @@ function Empresas() {
 
       await api.put(`/empresas/${empresa.id}`, {
         nombre: empresa.nombre,
+        slogan: empresa.slogan || "",
         rnc: empresa.rnc,
         telefono: empresa.telefono,
         direccion: empresa.direccion,
@@ -508,6 +521,12 @@ function Empresas() {
 
                           <td>
                             <strong>{empresa.nombre}</strong>
+
+                            {empresa.slogan && (
+                              <div className="text-muted small">
+                                {empresa.slogan}
+                              </div>
+                            )}
                           </td>
 
                           <td>{empresa.rnc || "-"}</td>
@@ -631,6 +650,27 @@ function Empresas() {
                       />
                     </div>
 
+                    {/* SLOGAN */}
+
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Slogan</label>
+
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="slogan"
+                        value={form.slogan}
+                        onChange={cambiarCampo}
+                        placeholder="Ej. Calidad y confianza a tu alcance"
+                        maxLength={255}
+                      />
+
+                      <div className="form-text">
+                        Se mostrará debajo del nombre de la empresa en las
+                        facturas.
+                      </div>
+                    </div>
+
                     {/* RNC */}
 
                     <div className="col-md-6 mb-3">
@@ -678,7 +718,7 @@ function Empresas() {
 
                     {/* DIRECCIÓN */}
 
-                    <div className="col-md-12 mb-3">
+                    <div className="col-md-6 mb-3">
                       <label className="form-label">Dirección</label>
 
                       <input

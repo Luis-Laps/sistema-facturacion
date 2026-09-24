@@ -25,6 +25,7 @@ router.get("/", validarToken, async (req, res) => {
       SELECT
         id,
         nombre,
+        slogan,
         rnc,
         telefono,
         direccion,
@@ -68,6 +69,7 @@ router.post("/", validarToken, async (req, res) => {
 
     const {
       nombre,
+      slogan,
       rnc,
       telefono,
       direccion,
@@ -150,6 +152,7 @@ router.post("/", validarToken, async (req, res) => {
       INSERT INTO empresas
       (
         nombre,
+        slogan,
         rnc,
         telefono,
         direccion,
@@ -162,11 +165,25 @@ router.post("/", validarToken, async (req, res) => {
         activo
       )
       VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
+      (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        true
+      )
       RETURNING *
       `,
       [
         nombre.trim(),
+        slogan ? slogan.trim() : null,
         rnc || null,
         telefono || null,
         direccion || null,
@@ -258,6 +275,7 @@ router.put("/:id", validarToken, async (req, res) => {
 
     const {
       nombre,
+      slogan,
       rnc,
       telefono,
       direccion,
@@ -318,20 +336,22 @@ router.put("/:id", validarToken, async (req, res) => {
       UPDATE empresas
       SET
         nombre = $1,
-        rnc = $2,
-        telefono = $3,
-        direccion = $4,
-        correo = $5,
-        logo_url = $6,
-        color_principal = $7,
-        tipo = $8,
-        propina_ley = $9,
-        itbis_ley = $10,
-        activo = COALESCE($11, activo)
-      WHERE id = $12
+        slogan = $2,
+        rnc = $3,
+        telefono = $4,
+        direccion = $5,
+        correo = $6,
+        logo_url = $7,
+        color_principal = $8,
+        tipo = $9,
+        propina_ley = $10,
+        itbis_ley = $11,
+        activo = COALESCE($12, activo)
+      WHERE id = $13
       RETURNING
         id,
         nombre,
+        slogan,
         rnc,
         telefono,
         direccion,
@@ -347,6 +367,7 @@ router.put("/:id", validarToken, async (req, res) => {
       `,
       [
         nombre.trim(),
+        slogan ? slogan.trim() : null,
         rnc || null,
         telefono || null,
         direccion || null,

@@ -18,6 +18,7 @@ router.post("/", validarToken, async (req, res) => {
 
     const {
       cliente_id,
+      direccion_cliente,
       productos,
       forma_pago = "EFECTIVO",
       propina_aplicada = false,
@@ -266,6 +267,7 @@ router.post("/", validarToken, async (req, res) => {
 
     const total =
       Math.round((subtotal + itbis + propina + Number.EPSILON) * 100) / 100;
+
     console.log("================================");
     console.log("Productos:", productos);
     console.log("Subtotal:", subtotal);
@@ -283,6 +285,24 @@ router.post("/", validarToken, async (req, res) => {
     }
 
     // ==========================================
+    // GENERAR NÚMERO DE FACTURA POR EMPRESA
+    // ==========================================
+
+    const numeroFacturaResult = await client.query(
+      `
+        SELECT obtener_siguiente_numero_factura($1)
+        AS numero_factura
+        `,
+      [req.usuario.empresa_id],
+    );
+
+    const numeroFactura = numeroFacturaResult.rows[0]?.numero_factura;
+
+    if (!numeroFactura) {
+      throw new Error("No fue posible generar el número de factura.");
+    }
+
+    // ==========================================
     // CREAR FACTURA
     // ==========================================
 
@@ -290,7 +310,9 @@ router.post("/", validarToken, async (req, res) => {
       `
       INSERT INTO facturas
       (
+        numero_factura,
         cliente_id,
+        direccion_cliente,
         fecha,
         total,
         caja_id,
@@ -303,23 +325,27 @@ router.post("/", validarToken, async (req, res) => {
         itbis
       )
       VALUES
-(
-  $1,
-  NOW() AT TIME ZONE 'America/Santo_Domingo',
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
-  $8,
-  $9,
-  $10
-)
-      RETURNING id
+      (
+        $1,
+        $2,
+        $3,
+        NOW() AT TIME ZONE 'America/Santo_Domingo',
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12
+      )
+      RETURNING id, numero_factura
       `,
       [
+        numeroFactura,
         cliente_id,
+        direccion_cliente?.trim() || null,
         total,
         cajaId,
         forma_pago,
@@ -333,6 +359,8 @@ router.post("/", validarToken, async (req, res) => {
     );
 
     const facturaId = facturaResult.rows[0].id;
+
+    const numeroFacturaGenerado = facturaResult.rows[0].numero_factura;
 
     // ==========================================
     // CREAR DETALLE
@@ -439,13 +467,13 @@ router.post("/", validarToken, async (req, res) => {
       if (productoActual.tipo === "PRODUCTO") {
         const stockResult = await client.query(
           `
-          UPDATE productos
-          SET stock = stock - $1
-          WHERE id = $2
-          AND empresa_id = $3
-          AND stock >= $1
-          RETURNING id
-          `,
+            UPDATE productos
+            SET stock = stock - $1
+            WHERE id = $2
+            AND empresa_id = $3
+            AND stock >= $1
+            RETURNING id
+            `,
           [item.cantidad, item.producto_id, req.usuario.empresa_id],
         );
 
@@ -508,6 +536,7 @@ router.post("/", validarToken, async (req, res) => {
 
     res.status(201).json({
       factura_id: facturaId,
+      numero_factura: numeroFacturaGenerado,
       subtotal,
       itbis_aplicado: aplicarItbis,
       itbis,
@@ -537,19 +566,24 @@ router.get("/", validarToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-      f.id,
-      f.fecha,
-      f.total,
-      f.forma_pago,
-      f.propina_aplicada,
-      f.propina,
-      f.itbis_aplicado,
-      f.itbis,
-COALESCE(c.nombre, 'Consumidor final') AS cliente
+        f.id,
+        f.numero_factura,
+        f.direccion_cliente,
+        f.fecha,
+        f.total,
+        f.forma_pago,
+        f.propina_aplicada,
+        f.propina,
+        f.itbis_aplicado,
+        f.itbis,
+        COALESCE(
+          c.nombre,
+          'Consumidor final'
+        ) AS cliente
       FROM facturas f
       LEFT JOIN clientes c
-  ON c.id = f.cliente_id
-  AND c.empresa_id = f.empresa_id
+        ON c.id = f.cliente_id
+        AND c.empresa_id = f.empresa_id
       WHERE f.empresa_id = $1
       ORDER BY f.id DESC
       `,
@@ -578,6 +612,8 @@ router.get("/:id", validarToken, async (req, res) => {
       `
       SELECT
         f.id,
+        f.numero_factura,
+        f.direccion_cliente,
         f.fecha,
         f.total,
         f.forma_pago,
@@ -587,7 +623,10 @@ router.get("/:id", validarToken, async (req, res) => {
         f.propina,
         f.itbis_aplicado,
         f.itbis,
-        COALESCE(c.nombre, 'Consumidor final') AS cliente,
+        COALESCE(
+          c.nombre,
+          'Consumidor final'
+        ) AS cliente,
         u.nombre AS usuario_nombre,
         u.usuario AS usuario
       FROM facturas f

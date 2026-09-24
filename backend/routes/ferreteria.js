@@ -1,9 +1,7 @@
 const express = require("express");
-
 const router = express.Router();
 
 const pool = require("../db/conexion");
-
 const validarToken = require("../middleware/auth");
 
 // ==========================================
@@ -108,7 +106,17 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
       productos,
       forma_pago = "EFECTIVO",
       itbis_aplicado = false,
+      direccion_cliente = null,
     } = req.body;
+
+    // ==========================================
+    // VALIDAR DIRECCIÓN DEL CLIENTE
+    // ==========================================
+
+    const direccionCliente =
+      direccion_cliente !== null && direccion_cliente !== undefined
+        ? String(direccion_cliente).trim() || null
+        : null;
 
     // ==========================================
     // VALIDAR PRODUCTOS
@@ -283,16 +291,34 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
     const total = Math.round((subtotal + itbis + Number.EPSILON) * 100) / 100;
 
     // ==========================================
+    // GENERAR NÚMERO DE FACTURA POR EMPRESA
+    // ==========================================
+
+    const numeroFacturaResult = await client.query(
+      `
+          SELECT obtener_siguiente_numero_factura($1) AS numero_factura
+          `,
+      [req.usuario.empresa_id],
+    );
+
+    const numeroFactura = numeroFacturaResult.rows[0]?.numero_factura;
+
+    if (!numeroFactura) {
+      throw new Error("No fue posible generar el número de factura.");
+    }
+
+    // ==========================================
     // CREAR FACTURA
-    // SIN CLIENTE
     // ==========================================
 
     const facturaResult = await client.query(
       `
         INSERT INTO facturas (
+          numero_factura,
           fecha,
           total,
           cliente_id,
+          direccion_cliente,
           caja_id,
           forma_pago,
           empresa_id,
@@ -303,22 +329,26 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
           itbis
         )
         VALUES (
-          NOW() AT TIME ZONE 'America/Santo_Domingo',
           $1,
-          NULL,
+          NOW() AT TIME ZONE 'America/Santo_Domingo',
           $2,
+          NULL,
           $3,
           $4,
           $5,
+          $6,
+          $7,
           FALSE,
           0,
-          $6,
-          $7
+          $8,
+          $9
         )
-        RETURNING id
+        RETURNING id, numero_factura
         `,
       [
+        numeroFactura,
         total,
+        direccionCliente,
         cajaId,
         forma_pago,
         req.usuario.empresa_id,
@@ -329,6 +359,8 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
     );
 
     const facturaId = facturaResult.rows[0].id;
+
+    const numeroFacturaGenerado = facturaResult.rows[0].numero_factura;
 
     // ==========================================
     // DETALLE + INVENTARIO
@@ -457,10 +489,20 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
         break;
     }
 
+    // ==========================================
+    // CONFIRMAR TRANSACCIÓN
+    // ==========================================
+
     await client.query("COMMIT");
+
+    // ==========================================
+    // RESPUESTA
+    // ==========================================
 
     res.status(201).json({
       factura_id: facturaId,
+      numero_factura: numeroFacturaGenerado,
+      direccion_cliente: direccionCliente,
       subtotal,
       itbis_aplicado: aplicarItbis,
       itbis,

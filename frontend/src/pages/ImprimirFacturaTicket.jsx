@@ -9,6 +9,7 @@ function ImprimirFacturaTicket() {
   const [searchParams] = useSearchParams();
 
   const esCopia = searchParams.get("copia") === "1";
+
   const [factura, setFactura] = useState(null);
   const [empresa, setEmpresa] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -17,6 +18,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // PREPARAR MODO IMPRESIÓN
   // ==========================================
+
   useEffect(() => {
     document.body.classList.add("ticket-printing");
 
@@ -28,6 +30,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // CARGAR DATOS
   // ==========================================
+
   useEffect(() => {
     const cargarDatos = async () => {
       try {
@@ -58,6 +61,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // HELPERS
   // ==========================================
+
   const formatearMoneda = (valor) => {
     return Number(valor || 0).toLocaleString("es-DO", {
       minimumFractionDigits: 2,
@@ -82,6 +86,7 @@ function ImprimirFacturaTicket() {
   // ==========================================
   // ESTADOS DE CARGA
   // ==========================================
+
   if (cargando) {
     return (
       <div className="ticket-loading-screen">
@@ -119,18 +124,22 @@ function ImprimirFacturaTicket() {
   // No recalculamos descuentos generales ni impuestos
   // a partir de parámetros externos: imprimimos lo que
   // realmente quedó guardado en la factura.
+
   const subtotalProductos = detalle.reduce(
     (total, item) => total + Number(item.subtotal || 0),
     0,
   );
 
   const descuento = Number(datosFactura.descuento || 0);
+
   const descuentoTipo = datosFactura.descuento_tipo || null;
 
   const subtotalConDescuento = Math.max(0, subtotalProductos - descuento);
 
   const propina = Number(datosFactura.propina || 0);
+
   const itbis = Number(datosFactura.itbis || 0);
+
   const total = Number(datosFactura.total || 0);
 
   const mostrarDescuento = descuento > 0 || Boolean(descuentoTipo);
@@ -141,9 +150,26 @@ function ImprimirFacturaTicket() {
     TRANSFERENCIA: "🏦 Transferencia",
   };
 
+  // ==========================================
+  // NÚMERO DE FACTURA
+  // ==========================================
+
+  // Las facturas nuevas utilizan numero_factura.
+  // Las facturas antiguas pueden no tenerlo,
+  // por lo que usamos el id como respaldo.
+
+  const numeroFactura = datosFactura.numero_factura || datosFactura.id;
+
+  // ==========================================
+  // DIRECCIÓN DEL CLIENTE
+  // ==========================================
+
+  const direccionCliente = datosFactura.direccion_cliente?.trim() || null;
+
   return (
     <>
       {/* BOTÓN SOLO PARA PANTALLA */}
+
       <div className="ticket-toolbar no-print">
         <button
           type="button"
@@ -155,6 +181,7 @@ function ImprimirFacturaTicket() {
       </div>
 
       {/* TICKET */}
+
       <main
         className="ticket-page"
         style={{
@@ -165,6 +192,7 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               EMPRESA
           ====================================== */}
+
           <header className="empresa">
             {empresa.logo_url && (
               <img
@@ -179,9 +207,16 @@ function ImprimirFacturaTicket() {
 
             <h2>{empresa.nombre}</h2>
 
+            {/* SLOGAN */}
+
+            {empresa.slogan && <p className="slogan">{empresa.slogan}</p>}
+
             {empresa.rnc && <p>RNC: {empresa.rnc}</p>}
+
             {empresa.direccion && <p>{empresa.direccion}</p>}
+
             {empresa.telefono && <p>Tel: {empresa.telefono}</p>}
+
             {empresa.correo && <p>{empresa.correo}</p>}
           </header>
 
@@ -217,19 +252,33 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               INFORMACIÓN
           ====================================== */}
+
           <section className="info-ticket">
             <div className="fila">
               <span>No. Factura</span>
-              <span>#{datosFactura.id}</span>
+
+              <span>#{numeroFactura}</span>
             </div>
 
             <div className="fila">
               <span>Cliente</span>
+
               <span>{datosFactura.cliente || "Consumidor final"}</span>
             </div>
 
+            {/* DIRECCIÓN DEL CLIENTE */}
+
+            {direccionCliente && (
+              <div className="fila">
+                <span>Dirección</span>
+
+                <span>{direccionCliente}</span>
+              </div>
+            )}
+
             <div className="fila">
               <span>Fecha</span>
+
               <span>{formatearFecha(datosFactura.fecha)}</span>
             </div>
           </section>
@@ -239,11 +288,15 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               DETALLE
           ====================================== */}
+
           <section className="ticket-items">
             {detalle.map((item, index) => {
               const cantidad = Number(item.cantidad || 0);
+
               const precio = Number(item.precio || 0);
+
               const descuentoItem = Number(item.descuento || 0);
+
               const subtotalItem = Number(item.subtotal || 0);
 
               return (
@@ -263,6 +316,7 @@ function ImprimirFacturaTicket() {
                   {descuentoItem > 0 && (
                     <div className="detalle-producto descuento-linea">
                       <span>Descuento producto</span>
+
                       <span>- RD$ {formatearMoneda(descuentoItem)}</span>
                     </div>
                   )}
@@ -276,9 +330,11 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               RESUMEN
           ====================================== */}
+
           <section className="resumen-ticket">
             <div className="fila">
               <span>Subtotal</span>
+
               <span>RD$ {formatearMoneda(subtotalProductos)}</span>
             </div>
 
@@ -295,6 +351,7 @@ function ImprimirFacturaTicket() {
 
                 <div className="fila">
                   <span>Subtotal con descuento</span>
+
                   <span>RD$ {formatearMoneda(subtotalConDescuento)}</span>
                 </div>
               </>
@@ -303,6 +360,7 @@ function ImprimirFacturaTicket() {
             {datosFactura.itbis_aplicado && itbis > 0 && (
               <div className="fila">
                 <span>ITBIS (18%)</span>
+
                 <span>RD$ {formatearMoneda(itbis)}</span>
               </div>
             )}
@@ -310,6 +368,7 @@ function ImprimirFacturaTicket() {
             {datosFactura.propina_aplicada && propina > 0 && (
               <div className="fila">
                 <span>Propina de ley (10%)</span>
+
                 <span>RD$ {formatearMoneda(propina)}</span>
               </div>
             )}
@@ -318,10 +377,16 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               TOTAL
           ====================================== */}
+
           <section className="total">
             <div className="titulo-total">TOTAL</div>
 
-            <div className="monto-total" style={{ color: colorPrincipal }}>
+            <div
+              className="monto-total"
+              style={{
+                color: colorPrincipal,
+              }}
+            >
               RD$ {formatearMoneda(total)}
             </div>
           </section>
@@ -331,6 +396,7 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               FORMA DE PAGO
           ====================================== */}
+
           <div className="fila forma-pago">
             <strong>Forma de pago</strong>
 
@@ -346,6 +412,7 @@ function ImprimirFacturaTicket() {
           {/* ======================================
               PIE
           ====================================== */}
+
           <footer className="footer">
             <strong>¡Gracias por su compra!</strong>
 
@@ -353,6 +420,8 @@ function ImprimirFacturaTicket() {
 
             <div className="footer-empresa">
               <strong>{empresa.nombre}</strong>
+
+              {empresa.slogan && <div>{empresa.slogan}</div>}
 
               {empresa.telefono && <div>{empresa.telefono}</div>}
 

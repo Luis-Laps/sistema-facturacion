@@ -14,15 +14,24 @@ function FerreteriaNuevaFactura() {
   const [carrito, setCarrito] = useState([]);
 
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+
   const [cantidad, setCantidad] = useState(1);
   const [descuento, setDescuento] = useState(0);
 
   const [formaPago, setFormaPago] = useState("EFECTIVO");
 
   const [itbisHabilitado, setItbisHabilitado] = useState(false);
+
   const [aplicarItbis, setAplicarItbis] = useState(false);
 
+  // ==========================================
+  // CLIENTE
+  // ==========================================
+
   const [nombreCliente, setNombreCliente] = useState("");
+
+  const [direccionCliente, setDireccionCliente] = useState("");
+
   const [nota, setNota] = useState("");
 
   const [procesando, setProcesando] = useState(false);
@@ -101,6 +110,7 @@ function FerreteriaNuevaFactura() {
   const agregarProducto = () => {
     if (!productoSeleccionado) {
       Swal.fire("Atención", "Seleccione un producto.", "warning");
+
       return;
     }
 
@@ -113,6 +123,7 @@ function FerreteriaNuevaFactura() {
         "La cantidad debe ser un número entero mayor que cero.",
         "warning",
       );
+
       return;
     }
 
@@ -122,11 +133,13 @@ function FerreteriaNuevaFactura() {
         `Disponible: ${productoSeleccionado.stock}`,
         "warning",
       );
+
       return;
     }
 
     if (Number.isNaN(descuentoFinal) || descuentoFinal < 0) {
       Swal.fire("Atención", "El descuento no es válido.", "warning");
+
       return;
     }
 
@@ -143,6 +156,7 @@ function FerreteriaNuevaFactura() {
           `Disponible: ${productoSeleccionado.stock}`,
           "warning",
         );
+
         return;
       }
 
@@ -236,6 +250,7 @@ function FerreteriaNuevaFactura() {
     setAplicarItbis(false);
     setBusqueda("");
     setNombreCliente("");
+    setDireccionCliente("");
     setNota("");
     setFormaPago("EFECTIVO");
   };
@@ -258,21 +273,34 @@ function FerreteriaNuevaFactura() {
           cantidad: item.cantidad,
           descuento: Number(item.descuento || 0),
         })),
+
         forma_pago: formaPago,
+
         itbis_aplicado: aplicarItbis,
+
+        // ==========================================
+        // DIRECCIÓN DEL CLIENTE
+        // ==========================================
+
+        direccion_cliente: direccionCliente.trim() || null,
       });
 
       const facturaId = response.data.factura_id;
+
+      const numeroFactura = response.data.numero_factura || facturaId;
 
       limpiarFormulario();
 
       const resultado = await Swal.fire({
         icon: "success",
         title: "Factura creada",
+
         html: `
           <div style="text-align:center">
+
             <div style="font-size:18px;margin-bottom:10px">
-              Factura <strong>#${facturaId}</strong>
+              Factura
+              <strong>#${numeroFactura}</strong>
             </div>
 
             <div style="margin-bottom:5px">
@@ -301,8 +329,10 @@ function FerreteriaNuevaFactura() {
                 RD$ ${formatearDinero(response.data.total)}
               </strong>
             </div>
+
           </div>
         `,
+
         showCancelButton: true,
         confirmButtonText: "🖨️ Imprimir factura",
         cancelButtonText: "Aceptar",
@@ -341,17 +371,26 @@ function FerreteriaNuevaFactura() {
       title: "Tipo de factura abierta",
       text: "Seleccione cómo desea clasificar esta factura.",
       input: "select",
+
       inputOptions: {
         PENDIENTE_PAGO: "🟡 Pendiente de pago",
+
         PENDIENTE_ENTREGA: "🔵 Pendiente de entrega",
+
         ABIERTA: "⚪ Abierta",
       },
+
       inputValue: "ABIERTA",
       inputPlaceholder: "Seleccione un tipo",
+
       showCancelButton: true,
+
       confirmButtonText: "Guardar factura",
+
       cancelButtonText: "Cancelar",
+
       reverseButtons: true,
+
       inputValidator: (value) => {
         if (!value) {
           return "Seleccione un tipo de factura.";
@@ -368,13 +407,23 @@ function FerreteriaNuevaFactura() {
 
       const response = await api.post("/ferreteria-abiertas", {
         nombre_cliente: nombreCliente.trim() || null,
+
+        // ==========================================
+        // DIRECCIÓN DEL CLIENTE
+        // ==========================================
+
+        direccion_cliente: direccionCliente.trim() || null,
+
         nota: nota.trim() || null,
+
         productos: carrito.map((item) => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,
           descuento: Number(item.descuento || 0),
         })),
+
         itbis_aplicado: aplicarItbis,
+
         tipo: seleccionTipo.value,
       });
 
@@ -385,8 +434,10 @@ function FerreteriaNuevaFactura() {
       await Swal.fire({
         icon: "success",
         title: "Factura abierta guardada",
+
         html: `
           <div style="text-align:center">
+
             <div style="font-size:18px;margin-bottom:10px">
               Factura abierta
               <strong>#${facturaAbiertaId}</strong>
@@ -398,8 +449,10 @@ function FerreteriaNuevaFactura() {
                 RD$ ${formatearDinero(response.data.factura?.total)}
               </strong>
             </div>
+
           </div>
         `,
+
         confirmButtonText: "Ver facturas abiertas",
       });
 
@@ -601,8 +654,11 @@ function FerreteriaNuevaFactura() {
                     <thead>
                       <tr>
                         <th>Producto</th>
+
                         <th className="text-center">Cant.</th>
+
                         <th className="text-end">Subtotal</th>
+
                         <th></th>
                       </tr>
                     </thead>
@@ -652,7 +708,9 @@ function FerreteriaNuevaFactura() {
 
               <hr />
 
-              {/* CLIENTE / REFERENCIA */}
+              {/* ==================================
+                  CLIENTE
+              ================================== */}
 
               <div className="mb-3">
                 <label className="form-label">Cliente / Referencia</label>
@@ -666,7 +724,29 @@ function FerreteriaNuevaFactura() {
                 />
               </div>
 
-              {/* NOTA */}
+              {/* ==================================
+                  DIRECCIÓN DEL CLIENTE
+              ================================== */}
+
+              <div className="mb-3">
+                <label className="form-label">
+                  Dirección del cliente
+                  <span className="text-muted"> (opcional)</span>
+                </label>
+
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Ej. Av. 27 de Febrero #123, Santo Domingo"
+                  value={direccionCliente}
+                  onChange={(e) => setDireccionCliente(e.target.value)}
+                  maxLength={500}
+                />
+              </div>
+
+              {/* ==================================
+                  NOTA
+              ================================== */}
 
               <div className="mb-3">
                 <label className="form-label">Nota</label>
@@ -680,7 +760,9 @@ function FerreteriaNuevaFactura() {
                 />
               </div>
 
-              {/* FORMA DE PAGO */}
+              {/* ==================================
+                  FORMA DE PAGO
+              ================================== */}
 
               <div className="mb-3">
                 <label className="form-label fw-semibold">Forma de pago</label>
@@ -691,12 +773,16 @@ function FerreteriaNuevaFactura() {
                   onChange={(e) => setFormaPago(e.target.value)}
                 >
                   <option value="EFECTIVO">💵 Efectivo</option>
+
                   <option value="TARJETA">💳 Tarjeta</option>
+
                   <option value="TRANSFERENCIA">🏦 Transferencia</option>
                 </select>
               </div>
 
-              {/* ITBIS */}
+              {/* ==================================
+                  ITBIS
+              ================================== */}
 
               {itbisHabilitado && (
                 <div className="form-check mb-3">
@@ -714,7 +800,9 @@ function FerreteriaNuevaFactura() {
                 </div>
               )}
 
-              {/* TOTALES */}
+              {/* ==================================
+                  TOTALES
+              ================================== */}
 
               <div className="border rounded p-3 bg-light">
                 <div className="d-flex justify-content-between mb-2">
@@ -742,7 +830,9 @@ function FerreteriaNuevaFactura() {
                 </div>
               </div>
 
-              {/* BOTONES */}
+              {/* ==================================
+                  BOTONES
+              ================================== */}
 
               <div className="d-grid gap-2 mt-3">
                 <button
