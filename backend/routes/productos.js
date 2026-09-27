@@ -21,6 +21,29 @@ const validarPermisoProductos = (req, res, next) => {
 };
 
 // ==========================================
+// VERIFICAR SI LA EMPRESA TIENE INVENTARIO
+// ==========================================
+
+const empresaTieneInventario = async (empresaId) => {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM empresa_modulos em
+    INNER JOIN modulos m
+      ON m.id = em.modulo_id
+    WHERE
+      em.empresa_id = $1
+      AND m.codigo = 'INVENTARIO'
+      AND em.activo = TRUE
+      AND m.activo = TRUE
+    LIMIT 1
+    `,
+    [empresaId],
+  );
+
+  return result.rows.length > 0;
+};
+// ==========================================
 // OBTENER TIPO DE EMPRESA
 // ==========================================
 
@@ -489,6 +512,10 @@ router.post("/", validarToken, validarPermisoProductos, async (req, res) => {
 // ACTUALIZAR PRODUCTO
 // ==========================================
 
+// ==========================================
+// ACTUALIZAR PRODUCTO
+// ==========================================
+
 router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
   try {
     const { id } = req.params;
@@ -500,8 +527,11 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
       categoria_id,
       costo_compra,
       precio_venta,
+      stock,
       tipo,
     } = req.body;
+
+    const empresaId = req.usuario.empresa_id;
 
     const tipoFinal = tipo || "PRODUCTO";
 
@@ -515,7 +545,6 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
       });
     }
 
-    // Los PRODUCTO deben tener código.
     if (tipoFinal === "PRODUCTO" && !codigo) {
       return res.status(400).json({
         mensaje: "El código es obligatorio para los productos.",
@@ -535,21 +564,46 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
     }
 
     // ==========================================
-    // VERIFICAR QUE EL PRODUCTO EXISTA
+    // VERIFICAR SI TIENE MÓDULO INVENTARIO
+    // ==========================================
+
+    const tieneInventario = await empresaTieneInventario(empresaId);
+
+    // ==========================================
+    // VALIDAR STOCK
+    // ==========================================
+
+    if (!tieneInventario && stock !== undefined) {
+      if (
+        stock === null ||
+        stock === "" ||
+        Number.isNaN(Number(stock)) ||
+        Number(stock) < 0 ||
+        !Number.isInteger(Number(stock))
+      ) {
+        return res.status(400).json({
+          mensaje:
+            "La cantidad de stock debe ser un número entero mayor o igual a cero.",
+        });
+      }
+    }
+
+    // ==========================================
+    // VERIFICAR PRODUCTO EXISTENTE
     // ==========================================
 
     const productoActual = await pool.query(
       `
-      SELECT
-        id,
-        stock,
-        tipo
-      FROM productos
-      WHERE
-        id = $1
-        AND empresa_id = $2
-      `,
-      [id, req.usuario.empresa_id],
+        SELECT
+          id,
+          stock,
+          tipo
+        FROM productos
+        WHERE
+          id = $1
+          AND empresa_id = $2
+        `,
+      [id, empresaId],
     );
 
     if (productoActual.rows.length === 0) {
@@ -564,12 +618,6 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
     // VERIFICAR CAMBIO DE TIPO
     // ==========================================
 
-    // Si un producto tiene existencias,
-    // no permitimos convertirlo directamente
-    // en ALIMENTO o SERVICIO.
-    //
-    // Primero debe llevar su inventario a 0
-    // mediante Inventario.
     if (
       productoExistente.tipo === "PRODUCTO" &&
       tipoFinal !== "PRODUCTO" &&
@@ -577,7 +625,7 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
     ) {
       return res.status(400).json({
         mensaje:
-          "No puede cambiar este producto a Alimento o Servicio mientras tenga existencias. Primero lleve su inventario a 0 desde Inventario.",
+          "No puede cambiar este producto a Alimento o Servicio mientras tenga existencias. Primero lleve su stock a 0.",
       });
     }
 
@@ -587,13 +635,13 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
 
     const categoria = await pool.query(
       `
-      SELECT id
-      FROM categorias
-      WHERE
-        id = $1
-        AND empresa_id = $2
-      `,
-      [categoria_id, req.usuario.empresa_id],
+        SELECT id
+        FROM categorias
+        WHERE
+          id = $1
+          AND empresa_id = $2
+        `,
+      [categoria_id, empresaId],
     );
 
     if (categoria.rows.length === 0) {
@@ -609,14 +657,14 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
     if (codigo) {
       const existe = await pool.query(
         `
-        SELECT id
-        FROM productos
-        WHERE
-          codigo = $1
-          AND empresa_id = $2
-          AND id <> $3
-        `,
-        [codigo, req.usuario.empresa_id, id],
+          SELECT id
+          FROM productos
+          WHERE
+            codigo = $1
+            AND empresa_id = $2
+            AND id <> $3
+          `,
+        [codigo, empresaId, id],
       );
 
       if (existe.rows.length > 0) {
@@ -629,42 +677,80 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
     // ==========================================
     // ACTUALIZAR PRODUCTO
     // ==========================================
-    //
-    // IMPORTANTE:
-    // STOCK NO SE ACTUALIZA AQUÍ.
-    //
-    // El stock solamente será modificado
-    // desde el módulo INVENTARIO.
-    //
 
-    const result = await pool.query(
-      `
-      UPDATE productos
-      SET
-        codigo = $1,
-        nombre = $2,
-        descripcion = $3,
-        categoria_id = $4,
-        costo_compra = $5,
-        precio_venta = $6,
-        tipo = $7
-      WHERE
-        id = $8
-        AND empresa_id = $9
-      RETURNING *
-      `,
-      [
-        codigo || null,
-        nombre,
-        descripcion || null,
-        categoria_id,
-        costo_compra,
-        precio_venta,
-        tipoFinal,
-        id,
-        req.usuario.empresa_id,
-      ],
-    );
+    let result;
+
+    if (tieneInventario) {
+      // ------------------------------------------
+      // CON INVENTARIO:
+      // STOCK NO SE TOCA
+      // ------------------------------------------
+
+      result = await pool.query(
+        `
+          UPDATE productos
+          SET
+            codigo = $1,
+            nombre = $2,
+            descripcion = $3,
+            categoria_id = $4,
+            costo_compra = $5,
+            precio_venta = $6,
+            tipo = $7
+          WHERE
+            id = $8
+            AND empresa_id = $9
+          RETURNING *
+          `,
+        [
+          codigo || null,
+          nombre,
+          descripcion || null,
+          categoria_id,
+          costo_compra,
+          precio_venta,
+          tipoFinal,
+          id,
+          empresaId,
+        ],
+      );
+    } else {
+      // ------------------------------------------
+      // SIN INVENTARIO:
+      // STOCK SÍ SE PUEDE EDITAR
+      // ------------------------------------------
+
+      result = await pool.query(
+        `
+          UPDATE productos
+          SET
+            codigo = $1,
+            nombre = $2,
+            descripcion = $3,
+            categoria_id = $4,
+            costo_compra = $5,
+            precio_venta = $6,
+            stock = $7,
+            tipo = $8
+          WHERE
+            id = $9
+            AND empresa_id = $10
+          RETURNING *
+          `,
+        [
+          codigo || null,
+          nombre,
+          descripcion || null,
+          categoria_id,
+          costo_compra,
+          precio_venta,
+          stock !== undefined ? Number(stock) : productoExistente.stock,
+          tipoFinal,
+          id,
+          empresaId,
+        ],
+      );
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -672,12 +758,16 @@ router.put("/:id", validarToken, validarPermisoProductos, async (req, res) => {
       });
     }
 
-    res.json(result.rows[0]);
+    res.json({
+      ...result.rows[0],
+      stock_editable: !tieneInventario,
+    });
   } catch (error) {
     console.error("Error al actualizar producto:", error);
 
     res.status(500).json({
       mensaje: "Error al actualizar producto",
+      error: error.message,
     });
   }
 });

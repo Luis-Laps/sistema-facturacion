@@ -13,17 +13,26 @@ const crearProductoVacio = () => ({
   costo_compra: 0,
   porcentaje_ganancia: 30,
   precio_venta: 0,
+  stock: 0,
   tipo: "PRODUCTO",
 });
 
 function Productos() {
   const navigate = useNavigate();
 
+  // ==========================================
+  // PAGINACIÓN
+  // ==========================================
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProductos, setTotalProductos] = useState(0);
 
   const limite = 10;
+
+  // ==========================================
+  // DATOS
+  // ==========================================
 
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -34,11 +43,21 @@ function Productos() {
 
   const [busqueda, setBusqueda] = useState("");
 
+  // ==========================================
+  // MODAL
+  // ==========================================
+
   const [mostrarModal, setMostrarModal] = useState(false);
   const [editando, setEditando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
 
   const [producto, setProducto] = useState(crearProductoVacio());
+
+  // ==========================================
+  // MÓDULOS DE LA EMPRESA
+  // ==========================================
+
+  const [tieneInventario, setTieneInventario] = useState(false);
 
   // ==========================================
   // CARGAR PRODUCTOS
@@ -48,15 +67,15 @@ function Productos() {
     try {
       const response = await api.get(`/productos?page=${page}&limit=${limite}`);
 
-      setProductos(response.data.data);
-      setTotalPages(response.data.totalPages);
-      setTotalProductos(response.data.total);
+      setProductos(response.data.data || []);
+      setTotalPages(response.data.totalPages || 1);
+      setTotalProductos(response.data.total || 0);
 
-      setInversion(response.data.inversion);
-      setGananciaProyectada(response.data.gananciaProyectada);
-      setValorTotal(response.data.valorTotal);
+      setInversion(response.data.inversion || 0);
+      setGananciaProyectada(response.data.gananciaProyectada || 0);
+      setValorTotal(response.data.valorTotal || 0);
     } catch (error) {
-      console.error(error);
+      console.error("Error al cargar productos:", error);
 
       Swal.fire(
         "Error",
@@ -74,9 +93,33 @@ function Productos() {
     try {
       const response = await api.get("/categorias");
 
-      setCategorias(response.data);
+      setCategorias(response.data || []);
     } catch (error) {
-      console.error(error);
+      console.error("Error al cargar categorías:", error);
+    }
+  };
+
+  // ==========================================
+  // CARGAR MÓDULOS DE LA EMPRESA
+  // ==========================================
+
+  const cargarModulos = async () => {
+    try {
+      const response = await api.get("/modulos/mis-modulos");
+
+      const modulos = response.data || [];
+
+      const inventarioActivo = modulos.some(
+        (modulo) => modulo.codigo === "INVENTARIO",
+      );
+
+      setTieneInventario(inventarioActivo);
+    } catch (error) {
+      console.error("Error al cargar módulos:", error);
+
+      // Si no se pueden cargar los módulos,
+      // dejamos el stock bloqueado por seguridad.
+      setTieneInventario(true);
     }
   };
 
@@ -112,11 +155,16 @@ function Productos() {
       }
     }
 
+    // Stock siempre entero
+    if (name === "stock") {
+      nuevo.stock = value === "" ? "" : Math.max(0, parseInt(value, 10) || 0);
+    }
+
     setProducto(nuevo);
   };
 
   // ==========================================
-  // NUEVO
+  // NUEVO PRODUCTO
   // ==========================================
 
   const nuevoProducto = () => {
@@ -132,10 +180,7 @@ function Productos() {
 
   const guardarProducto = async () => {
     try {
-      /*
-       * El código solamente es obligatorio
-       * para productos que manejan inventario.
-       */
+      // Validaciones
       if (
         (producto.tipo === "PRODUCTO" && !producto.codigo) ||
         !producto.nombre ||
@@ -146,23 +191,41 @@ function Productos() {
         return;
       }
 
-      /*
-       * IMPORTANTE:
-       *
-       * Ya NO enviamos stock desde este módulo.
-       *
-       * El stock será manejado exclusivamente
-       * desde el módulo INVENTARIO.
-       */
+      // ==========================================
+      // DATOS BASE
+      // ==========================================
+
       const datos = {
         codigo: producto.codigo,
         nombre: producto.nombre,
         categoria_id: Number(producto.categoria_id),
         descripcion: producto.descripcion,
-        costo_compra: Number(producto.costo_compra),
-        precio_venta: Number(producto.precio_venta),
+        costo_compra: Number(producto.costo_compra) || 0,
+        precio_venta: Number(producto.precio_venta) || 0,
         tipo: producto.tipo,
       };
+
+      // ==========================================
+      // STOCK
+      // ==========================================
+      //
+      // Empresa SIN INVENTARIO:
+      // puede modificar stock.
+      //
+      // Empresa CON INVENTARIO:
+      // - Al crear puede enviar stock inicial.
+      // - Al editar NO enviamos stock.
+      //
+      // El backend también valida esta regla.
+      // ==========================================
+
+      if (producto.tipo === "PRODUCTO" && (!tieneInventario || !editando)) {
+        datos.stock = Number(producto.stock) || 0;
+      }
+
+      // ==========================================
+      // EDITAR
+      // ==========================================
 
       if (editando) {
         await api.put(`/productos/${editandoId}`, datos);
@@ -173,7 +236,12 @@ function Productos() {
           timer: 1500,
           showConfirmButton: false,
         });
-      } else {
+      }
+
+      // ==========================================
+      // CREAR
+      // ==========================================
+      else {
         await api.post("/productos", datos);
 
         Swal.fire({
@@ -189,7 +257,7 @@ function Productos() {
       cargarProductos();
       cargarCategorias();
     } catch (error) {
-      console.error(error);
+      console.error("Error al guardar producto:", error);
 
       Swal.fire(
         "Error",
@@ -200,18 +268,15 @@ function Productos() {
   };
 
   // ==========================================
-  // EDITAR
+  // EDITAR PRODUCTO
   // ==========================================
 
   const editarProducto = (item) => {
+    const costo = Number(item.costo_compra) || 0;
+    const precio = Number(item.precio_venta) || 0;
+
     const porcentaje =
-      Number(item.costo_compra) > 0
-        ? (
-            ((Number(item.precio_venta) - Number(item.costo_compra)) /
-              Number(item.costo_compra)) *
-            100
-          ).toFixed(2)
-        : 0;
+      costo > 0 ? (((precio - costo) / costo) * 100).toFixed(2) : 0;
 
     setProducto({
       codigo: item.codigo || "",
@@ -221,6 +286,7 @@ function Productos() {
       costo_compra: item.costo_compra || 0,
       precio_venta: item.precio_venta || 0,
       porcentaje_ganancia: porcentaje,
+      stock: item.stock ?? 0,
       tipo: item.tipo || "PRODUCTO",
     });
 
@@ -257,7 +323,7 @@ function Productos() {
 
       cargarProductos();
     } catch (error) {
-      console.error(error);
+      console.error("Error al eliminar:", error);
 
       Swal.fire(
         "Error",
@@ -288,7 +354,12 @@ function Productos() {
   useEffect(() => {
     cargarProductos();
     cargarCategorias();
+    cargarModulos();
   }, [page]);
+
+  // ==========================================
+  // RENDER
+  // ==========================================
 
   return (
     <>
@@ -321,7 +392,28 @@ function Productos() {
         </div>
 
         {/* ==========================================
-            RESUMEN DEL INVENTARIO
+            INDICADOR DE INVENTARIO
+        ========================================== */}
+
+        <div className="mb-3">
+          {tieneInventario ? (
+            <div className="alert alert-info mb-0">
+              <strong>📦 Módulo Inventario activo</strong>
+              <br />
+              El stock se administra desde el módulo <strong>Inventario</strong>
+              .
+            </div>
+          ) : (
+            <div className="alert alert-secondary mb-0">
+              <strong>📦 Inventario no activo</strong>
+              <br />
+              Las existencias pueden administrarse directamente desde Productos.
+            </div>
+          )}
+        </div>
+
+        {/* ==========================================
+            RESUMEN
         ========================================== */}
 
         <div className="row g-3 mb-4">
@@ -407,7 +499,7 @@ function Productos() {
             <input
               type="text"
               className="form-control"
-              placeholder="Buscar por código o nombre..."
+              placeholder="Buscar por código, nombre o categoría..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
@@ -574,6 +666,8 @@ function Productos() {
           >
             <div className="modal-dialog modal-lg">
               <div className="modal-content">
+                {/* HEADER */}
+
                 <div className="modal-header">
                   <h5 className="modal-title">
                     {editando ? "Editar Producto" : "Nuevo Producto"}
@@ -585,13 +679,17 @@ function Productos() {
                   />
                 </div>
 
+                {/* BODY */}
+
                 <div className="modal-body">
                   <div className="row">
-                    {/* CÓDIGO */}
+                    {/* ==================================
+                        CÓDIGO
+                    ================================== */}
 
                     {producto.tipo === "PRODUCTO" && (
                       <div className="col-md-4 mb-3">
-                        <label>Código</label>
+                        <label className="form-label">Código</label>
 
                         <input
                           className="form-control"
@@ -602,7 +700,9 @@ function Productos() {
                       </div>
                     )}
 
-                    {/* NOMBRE */}
+                    {/* ==================================
+                        NOMBRE
+                    ================================== */}
 
                     <div
                       className={
@@ -611,7 +711,7 @@ function Productos() {
                           : "col-md-12 mb-3"
                       }
                     >
-                      <label>Nombre</label>
+                      <label className="form-label">Nombre</label>
 
                       <input
                         className="form-control"
@@ -621,10 +721,12 @@ function Productos() {
                       />
                     </div>
 
-                    {/* CATEGORÍA */}
+                    {/* ==================================
+                        CATEGORÍA
+                    ================================== */}
 
                     <div className="col-md-6 mb-3">
-                      <label>Categoría</label>
+                      <label className="form-label">Categoría</label>
 
                       <select
                         className="form-select"
@@ -642,10 +744,12 @@ function Productos() {
                       </select>
                     </div>
 
-                    {/* TIPO */}
+                    {/* ==================================
+                        TIPO
+                    ================================== */}
 
                     <div className="col-md-6 mb-3">
-                      <label>Tipo</label>
+                      <label className="form-label">Tipo</label>
 
                       <select
                         className="form-select"
@@ -661,10 +765,12 @@ function Productos() {
                       </select>
                     </div>
 
-                    {/* COSTO */}
+                    {/* ==================================
+                        COSTO
+                    ================================== */}
 
                     <div className="col-md-4 mb-3">
-                      <label>Costo de compra</label>
+                      <label className="form-label">Costo de compra</label>
 
                       <input
                         className="form-control"
@@ -677,10 +783,12 @@ function Productos() {
                       />
                     </div>
 
-                    {/* GANANCIA */}
+                    {/* ==================================
+                        GANANCIA
+                    ================================== */}
 
                     <div className="col-md-4 mb-3">
-                      <label>% Ganancia</label>
+                      <label className="form-label">% Ganancia</label>
 
                       <input
                         className="form-control"
@@ -693,10 +801,12 @@ function Productos() {
                       />
                     </div>
 
-                    {/* PRECIO */}
+                    {/* ==================================
+                        PRECIO
+                    ================================== */}
 
                     <div className="col-md-4 mb-3">
-                      <label>Precio venta</label>
+                      <label className="form-label">Precio venta</label>
 
                       <input
                         className="form-control"
@@ -709,10 +819,47 @@ function Productos() {
                       />
                     </div>
 
-                    {/* DESCRIPCIÓN */}
+                    {/* ==================================
+                        STOCK
+                    ================================== */}
+
+                    {producto.tipo === "PRODUCTO" && (
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label">Stock</label>
+
+                        <input
+                          className="form-control"
+                          type="number"
+                          min="0"
+                          step="1"
+                          name="stock"
+                          value={producto.stock ?? 0}
+                          onChange={handleChange}
+                          disabled={tieneInventario && editando}
+                        />
+
+                        {tieneInventario && editando ? (
+                          <div className="form-text text-danger">
+                            🔒 El stock se gestiona desde Inventario.
+                          </div>
+                        ) : tieneInventario && !editando ? (
+                          <div className="form-text">
+                            Stock inicial del producto.
+                          </div>
+                        ) : (
+                          <div className="form-text">
+                            Puedes modificar el stock directamente aquí.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ==================================
+                        DESCRIPCIÓN
+                    ================================== */}
 
                     <div className="col-12 mb-3">
-                      <label>Descripción</label>
+                      <label className="form-label">Descripción</label>
 
                       <textarea
                         rows="3"
@@ -723,22 +870,43 @@ function Productos() {
                       />
                     </div>
 
-                    {/* INFORMACIÓN DE INVENTARIO */}
+                    {/* ==================================
+                        AVISO INVENTARIO
+                    ================================== */}
 
-                    {producto.tipo === "PRODUCTO" && (
+                    {producto.tipo === "PRODUCTO" && tieneInventario && (
                       <div className="col-12">
                         <div className="alert alert-info">
-                          <strong>Inventario</strong>
+                          <strong>📦 Inventario</strong>
                           <br />
-                          Las existencias no se modifican desde este módulo.
+                          Las existencias se gestionan desde el módulo
+                          <strong> Inventario</strong>.
                           <br />
-                          Utilice <strong>Inventario</strong> para registrar
-                          entradas, salidas y ajustes.
+                          Utilice Inventario para registrar entradas, salidas y
+                          ajustes.
                         </div>
                       </div>
                     )}
 
-                    {/* GANANCIA */}
+                    {/* ==================================
+                        AVISO SIN INVENTARIO
+                    ================================== */}
+
+                    {producto.tipo === "PRODUCTO" && !tieneInventario && (
+                      <div className="col-12">
+                        <div className="alert alert-secondary">
+                          <strong>📦 Gestión directa de stock</strong>
+                          <br />
+                          Esta empresa no tiene habilitado el módulo Inventario,
+                          por lo que las existencias pueden modificarse
+                          directamente desde aquí.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ==================================
+                        GANANCIA POR UNIDAD
+                    ================================== */}
 
                     <div className="col-12">
                       <div className="alert alert-success">
@@ -754,6 +922,8 @@ function Productos() {
                     </div>
                   </div>
                 </div>
+
+                {/* FOOTER */}
 
                 <div className="modal-footer">
                   <button
