@@ -67,9 +67,45 @@ function FerreteriaHistorialFacturas() {
     });
   };
 
+  // ==========================================
+  // IMPRIMIR FACTURA NORMAL
+  // ==========================================
+
   const imprimirFactura = (id) => {
+    if (!id) {
+      Swal.fire({
+        icon: "error",
+        title: "Factura inválida",
+        text: "No se encontró el ID de la factura.",
+      });
+
+      return;
+    }
+
     navigate(`/imprimir-factura/${id}`);
   };
+
+  // ==========================================
+  // REIMPRIMIR FACTURA COMO COPIA
+  // ==========================================
+
+  const reimprimirCopia = (id) => {
+    if (!id) {
+      Swal.fire({
+        icon: "error",
+        title: "Factura inválida",
+        text: "No se encontró el ID de la factura.",
+      });
+
+      return;
+    }
+
+    navigate(`/imprimir-factura/${id}?copia=1`);
+  };
+
+  // ==========================================
+  // VER FACTURA
+  // ==========================================
 
   const verFactura = async (id) => {
     try {
@@ -92,17 +128,29 @@ function FerreteriaHistorialFacturas() {
                     <th>Subtotal</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   ${detalles
                     .map(
                       (detalle) => `
                         <tr>
-                          <td>${detalle.producto_nombre || detalle.nombre || "-"}</td>
-                          <td>${detalle.cantidad || 0}</td>
-                          <td>RD$ ${formatearMonto(
-                            detalle.precio_unitario || detalle.precio || 0,
-                          )}</td>
-                          <td>RD$ ${formatearMonto(detalle.subtotal || 0)}</td>
+                          <td>
+                            ${detalle.producto_nombre || detalle.nombre || "-"}
+                          </td>
+
+                          <td>
+                            ${detalle.cantidad || 0}
+                          </td>
+
+                          <td>
+                            RD$ ${formatearMonto(
+                              detalle.precio_unitario || detalle.precio || 0,
+                            )}
+                          </td>
+
+                          <td>
+                            RD$ ${formatearMonto(detalle.subtotal || 0)}
+                          </td>
                         </tr>
                       `,
                     )
@@ -115,10 +163,13 @@ function FerreteriaHistorialFacturas() {
 
       Swal.fire({
         title: `Factura #${factura.id}`,
+
         html: `
           <div class="text-start">
+
             <p class="mb-1">
-              <strong>Fecha:</strong> ${formatearFecha(factura.fecha)}
+              <strong>Fecha:</strong>
+              ${formatearFecha(factura.fecha)}
             </p>
 
             <p class="mb-1">
@@ -134,13 +185,20 @@ function FerreteriaHistorialFacturas() {
             ${productosHtml}
 
             <div class="text-end mt-3">
-              <strong>Total: RD$ ${formatearMonto(factura.total)}</strong>
+              <strong>
+                Total: RD$ ${formatearMonto(factura.total)}
+              </strong>
             </div>
+
           </div>
         `,
+
         width: "850px",
+
         showCancelButton: true,
+
         confirmButtonText: "🖨️ Imprimir",
+
         cancelButtonText: "Cerrar",
       }).then((result) => {
         if (result.isConfirmed) {
@@ -163,6 +221,7 @@ function FerreteriaHistorialFacturas() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="mb-1">Historial de Facturas</h2>
+
           <p className="text-muted mb-0">
             Consulta e imprime las facturas realizadas.
           </p>
@@ -244,7 +303,8 @@ function FerreteriaHistorialFacturas() {
                       </td>
 
                       <td>
-                        <div className="d-flex justify-content-center gap-2">
+                        <div className="d-flex justify-content-center gap-2 flex-wrap">
+                          {/* VER */}
                           <button
                             type="button"
                             className="btn btn-sm btn-outline-primary"
@@ -253,12 +313,22 @@ function FerreteriaHistorialFacturas() {
                             👁️ Ver
                           </button>
 
+                          {/* IMPRIMIR NORMAL */}
                           <button
                             type="button"
                             className="btn btn-sm btn-success"
                             onClick={() => imprimirFactura(factura.id)}
                           >
                             🖨️ Imprimir
+                          </button>
+
+                          {/* REIMPRIMIR COMO COPIA */}
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => reimprimirCopia(factura.id)}
+                          >
+                            📄 Reimprimir copia
                           </button>
                         </div>
                       </td>

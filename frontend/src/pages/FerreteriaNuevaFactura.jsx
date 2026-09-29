@@ -268,6 +268,8 @@ function FerreteriaNuevaFactura() {
       setProcesando(true);
 
       const response = await api.post("/ferreteria/facturas", {
+        nombre_cliente: nombreCliente.trim() || null,
+
         productos: carrito.map((item) => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,
@@ -275,16 +277,8 @@ function FerreteriaNuevaFactura() {
         })),
 
         forma_pago: formaPago,
-
         itbis_aplicado: aplicarItbis,
-
-        // ==========================================
-        // DIRECCIÓN DEL CLIENTE
-        // ==========================================
-
-        direccion_cliente: direccionCliente.trim() || null,
       });
-
       const facturaId = response.data.factura_id;
 
       const numeroFactura = response.data.numero_factura || facturaId;

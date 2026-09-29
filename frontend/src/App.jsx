@@ -19,6 +19,7 @@ import ImprimirCuentaPendiente from "./pages/ImprimirCuentaPendiente";
 import ImprimirCierreCaja from "./pages/ImprimirCierreCaja";
 import ImprimirFacturaAbierta from "./components/ImprimirFacturaAbierta";
 import Inventario from "./pages/Inventario";
+import AvisoNotificacion from "./components/AvisoNotificacion";
 
 // ==========================================
 // FERRETERÍA
@@ -56,6 +57,8 @@ function App() {
           element={
             <div className="app-layout">
               <Navbar />
+
+              <AvisoNotificacion />
 
               <main className="app-content">
                 <Routes>

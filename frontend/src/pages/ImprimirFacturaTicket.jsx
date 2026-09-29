@@ -259,11 +259,14 @@ function ImprimirFacturaTicket() {
 
               <span>#{numeroFactura}</span>
             </div>
-
             <div className="fila">
               <span>Cliente</span>
-
-              <span>{datosFactura.cliente || "Consumidor final"}</span>
+              <span>
+                {datosFactura.cliente ||
+                  datosFactura.nombre_cliente ||
+                  datosFactura.cliente_nombre ||
+                  "Consumidor final"}
+              </span>
             </div>
 
             {/* DIRECCIÓN DEL CLIENTE */}

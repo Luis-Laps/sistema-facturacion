@@ -22,26 +22,26 @@ router.get("/", validarToken, async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT
-        id,
-        nombre,
-        slogan,
-        rnc,
-        telefono,
-        direccion,
-        correo,
-        logo_url,
-        color_principal,
-        tipo,
-        propina_ley,
-        itbis_ley,
-        activo,
-        fecha_vencimiento,
-        created_at
-      FROM empresas
-      ORDER BY id DESC
-    `);
-
+  SELECT
+    id,
+    nombre,
+    rnc,
+    telefono,
+    direccion,
+    correo,
+    logo_url,
+    color_principal,
+    tipo,
+    propina_ley,
+    itbis_ley,
+    activo,
+    fecha_vencimiento,
+    fecha_mantenimiento,
+    monto_mantenimiento,
+    created_at
+  FROM empresas
+  ORDER BY id DESC
+`);
     res.json(result.rows);
   } catch (error) {
     console.error("Error al obtener empresas:", error);

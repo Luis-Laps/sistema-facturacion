@@ -107,7 +107,17 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
       forma_pago = "EFECTIVO",
       itbis_aplicado = false,
       direccion_cliente = null,
+      nombre_cliente = null,
     } = req.body;
+
+    // ==========================================
+    // VALIDAR NOMBRE DEL CLIENTE
+    // ==========================================
+
+    const nombreCliente =
+      nombre_cliente !== null && nombre_cliente !== undefined
+        ? String(nombre_cliente).trim() || null
+        : null;
 
     // ==========================================
     // VALIDAR DIRECCIÓN DEL CLIENTE
@@ -296,7 +306,8 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
 
     const numeroFacturaResult = await client.query(
       `
-          SELECT obtener_siguiente_numero_factura($1) AS numero_factura
+          SELECT obtener_siguiente_numero_factura($1)
+            AS numero_factura
           `,
       [req.usuario.empresa_id],
     );
@@ -318,6 +329,7 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
           fecha,
           total,
           cliente_id,
+          nombre_cliente,
           direccion_cliente,
           caja_id,
           forma_pago,
@@ -338,16 +350,18 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
           $5,
           $6,
           $7,
+          $8,
           FALSE,
           0,
-          $8,
-          $9
+          $9,
+          $10
         )
-        RETURNING id, numero_factura
+        RETURNING id, numero_factura, nombre_cliente
         `,
       [
         numeroFactura,
         total,
+        nombreCliente,
         direccionCliente,
         cajaId,
         forma_pago,
@@ -401,14 +415,14 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
 
       const stockResult = await client.query(
         `
-          UPDATE productos
-          SET stock = stock - $1
-          WHERE
-            id = $2
-            AND empresa_id = $3
-            AND stock >= $1
-          RETURNING stock
-          `,
+            UPDATE productos
+            SET stock = stock - $1
+            WHERE
+              id = $2
+              AND empresa_id = $3
+              AND stock >= $1
+            RETURNING stock
+            `,
         [item.cantidad, producto.id, req.usuario.empresa_id],
       );
 
@@ -502,6 +516,7 @@ router.post("/facturas", validarToken, validarFerreteria, async (req, res) => {
     res.status(201).json({
       factura_id: facturaId,
       numero_factura: numeroFacturaGenerado,
+      nombre_cliente: nombreCliente,
       direccion_cliente: direccionCliente,
       subtotal,
       itbis_aplicado: aplicarItbis,

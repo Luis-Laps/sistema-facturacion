@@ -565,27 +565,35 @@ router.get("/", validarToken, async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT
-        f.id,
-        f.numero_factura,
-        f.direccion_cliente,
-        f.fecha,
-        f.total,
-        f.forma_pago,
-        f.propina_aplicada,
-        f.propina,
-        f.itbis_aplicado,
-        f.itbis,
-        COALESCE(
-          c.nombre,
-          'Consumidor final'
-        ) AS cliente
-      FROM facturas f
-      LEFT JOIN clientes c
-        ON c.id = f.cliente_id
-        AND c.empresa_id = f.empresa_id
-      WHERE f.empresa_id = $1
-      ORDER BY f.id DESC
+     SELECT
+  f.id,
+  f.numero_factura,
+  f.direccion_cliente,
+  f.fecha,
+  f.total,
+  f.forma_pago,
+  f.propina_aplicada,
+  f.propina,
+  f.itbis_aplicado,
+  f.itbis,
+
+  COALESCE(
+    c.nombre,
+    f.nombre_cliente,
+    'Consumidor final'
+  ) AS cliente,
+
+  f.nombre_cliente
+
+FROM facturas f
+
+LEFT JOIN clientes c
+  ON c.id = f.cliente_id
+  AND c.empresa_id = f.empresa_id
+
+WHERE f.empresa_id = $1
+
+ORDER BY f.id DESC
       `,
       [req.usuario.empresa_id],
     );
@@ -611,36 +619,42 @@ router.get("/:id", validarToken, async (req, res) => {
     const facturaResult = await pool.query(
       `
       SELECT
-        f.id,
-        f.numero_factura,
-        f.direccion_cliente,
-        f.fecha,
-        f.total,
-        f.forma_pago,
-        f.descuento_tipo,
-        f.descuento,
-        f.propina_aplicada,
-        f.propina,
-        f.itbis_aplicado,
-        f.itbis,
-        COALESCE(
-          c.nombre,
-          'Consumidor final'
-        ) AS cliente,
-        u.nombre AS usuario_nombre,
-        u.usuario AS usuario
-      FROM facturas f
+  f.id,
+  f.numero_factura,
+  f.direccion_cliente,
+  f.fecha,
+  f.total,
+  f.forma_pago,
+  f.descuento_tipo,
+  f.descuento,
+  f.propina_aplicada,
+  f.propina,
+  f.itbis_aplicado,
+  f.itbis,
 
-      LEFT JOIN clientes c
-        ON c.id = f.cliente_id
-        AND c.empresa_id = f.empresa_id
+  COALESCE(
+    c.nombre,
+    f.nombre_cliente,
+    'Consumidor final'
+  ) AS cliente,
 
-      LEFT JOIN usuarios u
-        ON u.id = f.usuario_id
-        AND u.empresa_id = f.empresa_id
+  f.nombre_cliente,
 
-      WHERE f.id = $1
-      AND f.empresa_id = $2
+  u.nombre AS usuario_nombre,
+  u.usuario AS usuario
+
+FROM facturas f
+
+LEFT JOIN clientes c
+  ON c.id = f.cliente_id
+  AND c.empresa_id = f.empresa_id
+
+LEFT JOIN usuarios u
+  ON u.id = f.usuario_id
+  AND u.empresa_id = f.empresa_id
+
+WHERE f.id = $1
+AND f.empresa_id = $2
       `,
       [id, req.usuario.empresa_id],
     );
