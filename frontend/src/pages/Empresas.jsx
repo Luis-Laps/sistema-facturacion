@@ -2,24 +2,53 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 
 function Empresas() {
-  // ==========================================
-  // ESTADOS PRINCIPALES
-  // ==========================================
+  // =====================================================
+  // EMPRESAS
+  // =====================================================
 
   const [empresas, setEmpresas] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  // ==========================================
-  // EMPRESA EN EDICIÓN
-  // ==========================================
+  // =====================================================
+  // FORMULARIO EMPRESA
+  // =====================================================
 
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [empresaEditando, setEmpresaEditando] = useState(null);
 
-  // ==========================================
+  const [form, setForm] = useState({
+    nombre: "",
+    rnc: "",
+    telefono: "",
+    direccion: "",
+    correo: "",
+    logo_url: "",
+    color_principal: "#198754",
+    slogan: "",
+    tipo: "ESTANDAR",
+    propina_ley: false,
+    itbis_ley: false,
+    admin_nombre: "",
+    admin_usuario: "",
+    admin_password: "",
+  });
+
+  // =====================================================
+  // MÓDULOS
+  // =====================================================
+
+  const [modulos, setModulos] = useState([]);
+  const [empresaModulos, setEmpresaModulos] = useState([]);
+  const [empresaModulosActual, setEmpresaModulosActual] = useState(null);
+
+  const [mostrarModalModulos, setMostrarModalModulos] = useState(false);
+  const [cargandoModulos, setCargandoModulos] = useState(false);
+  const [guardandoModulo, setGuardandoModulo] = useState(false);
+
+  // =====================================================
   // MANTENIMIENTO
-  // ==========================================
+  // =====================================================
 
   const [mostrarMantenimiento, setMostrarMantenimiento] = useState(false);
   const [empresaMantenimiento, setEmpresaMantenimiento] = useState(null);
@@ -31,25 +60,17 @@ function Empresas() {
 
   const [guardandoMantenimiento, setGuardandoMantenimiento] = useState(false);
 
-  // ==========================================
-  // AVISO DE MANTENIMIENTO
-  // ==========================================
-
-  const [mostrarAviso, setMostrarAviso] = useState(false);
-  const [empresaAviso, setEmpresaAviso] = useState(null);
-  const [mensajeAviso, setMensajeAviso] = useState("");
-  const [enviandoAviso, setEnviandoAviso] = useState(false);
-
-  // ==========================================
+  // =====================================================
   // HISTORIAL DE MANTENIMIENTO
-  // ==========================================
+  // =====================================================
 
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [historialMantenimiento, setHistorialMantenimiento] = useState([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
-  // ==========================================
+  // =====================================================
   // REGISTRAR MANTENIMIENTO
-  // ==========================================
+  // =====================================================
 
   const [mostrarRegistrarMantenimiento, setMostrarRegistrarMantenimiento] =
     useState(false);
@@ -62,30 +83,18 @@ function Empresas() {
 
   const [guardandoRegistro, setGuardandoRegistro] = useState(false);
 
-  // ==========================================
-  // FORMULARIO EMPRESA
-  // ==========================================
+  // =====================================================
+  // AVISO MANUAL DE MANTENIMIENTO
+  // =====================================================
 
-  const [form, setForm] = useState({
-    nombre: "",
-    slogan: "",
-    rnc: "",
-    telefono: "",
-    direccion: "",
-    correo: "",
-    logo_url: "",
-    color_principal: "#198754",
-    tipo: "ESTANDAR",
-    propina_ley: false,
-    itbis_ley: false,
-    admin_nombre: "",
-    admin_usuario: "",
-    admin_password: "",
-  });
+  const [mostrarAviso, setMostrarAviso] = useState(false);
+  const [empresaAviso, setEmpresaAviso] = useState(null);
+  const [mensajeAviso, setMensajeAviso] = useState("");
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
 
-  // ==========================================
+  // =====================================================
   // CARGAR EMPRESAS
-  // ==========================================
+  // =====================================================
 
   const cargarEmpresas = async () => {
     try {
@@ -105,16 +114,39 @@ function Empresas() {
     }
   };
 
+  // =====================================================
+  // CARGAR TODOS LOS MÓDULOS
+  // =====================================================
+
+  const cargarModulos = async () => {
+    try {
+      const response = await api.get("/modulos");
+
+      setModulos(response.data || []);
+    } catch (error) {
+      console.error("Error al cargar módulos:", error);
+
+      alert(
+        error.response?.data?.mensaje || "No fue posible cargar los módulos.",
+      );
+    }
+  };
+
+  // =====================================================
+  // CARGA INICIAL
+  // =====================================================
+
   useEffect(() => {
     cargarEmpresas();
+    cargarModulos();
   }, []);
 
-  // ==========================================
-  // CAMBIAR CAMPOS DEL FORMULARIO
-  // ==========================================
+  // =====================================================
+  // CAMBIAR CAMPOS
+  // =====================================================
 
   const cambiarCampo = (e) => {
-    const { name, type, checked, value } = e.target;
+    const { name, value, type, checked } = e.target;
 
     setForm((anterior) => ({
       ...anterior,
@@ -122,22 +154,22 @@ function Empresas() {
     }));
   };
 
-  // ==========================================
+  // =====================================================
   // NUEVA EMPRESA
-  // ==========================================
+  // =====================================================
 
   const abrirFormulario = () => {
     setEmpresaEditando(null);
 
     setForm({
       nombre: "",
-      slogan: "",
       rnc: "",
       telefono: "",
       direccion: "",
       correo: "",
       logo_url: "",
       color_principal: "#198754",
+      slogan: "",
       tipo: "ESTANDAR",
       propina_ley: false,
       itbis_ley: false,
@@ -149,22 +181,22 @@ function Empresas() {
     setMostrarFormulario(true);
   };
 
-  // ==========================================
+  // =====================================================
   // EDITAR EMPRESA
-  // ==========================================
+  // =====================================================
 
   const abrirEditar = (empresa) => {
     setEmpresaEditando(empresa);
 
     setForm({
       nombre: empresa.nombre || "",
-      slogan: empresa.slogan || "",
       rnc: empresa.rnc || "",
       telefono: empresa.telefono || "",
       direccion: empresa.direccion || "",
       correo: empresa.correo || "",
       logo_url: empresa.logo_url || "",
       color_principal: empresa.color_principal || "#198754",
+      slogan: empresa.slogan || "",
       tipo: empresa.tipo || "ESTANDAR",
       propina_ley: empresa.propina_ley === true,
       itbis_ley: empresa.itbis_ley === true,
@@ -176,32 +208,26 @@ function Empresas() {
     setMostrarFormulario(true);
   };
 
-  // ==========================================
+  // =====================================================
   // CERRAR FORMULARIO
-  // ==========================================
+  // =====================================================
 
   const cerrarFormulario = () => {
-    if (guardando) {
-      return;
-    }
+    if (guardando) return;
 
     setMostrarFormulario(false);
     setEmpresaEditando(null);
   };
 
-  // ==========================================
+  // =====================================================
   // GUARDAR EMPRESA
-  // ==========================================
+  // =====================================================
 
   const guardarEmpresa = async () => {
     if (!form.nombre.trim()) {
       alert("Debe indicar el nombre de la empresa.");
       return;
     }
-
-    // ==========================================
-    // VALIDACIONES AL CREAR
-    // ==========================================
 
     if (!empresaEditando) {
       if (!form.admin_nombre.trim()) {
@@ -223,33 +249,40 @@ function Empresas() {
     try {
       setGuardando(true);
 
-      // ==========================================
+      const datos = {
+        nombre: form.nombre.trim(),
+        rnc: form.rnc,
+        telefono: form.telefono,
+        direccion: form.direccion,
+        correo: form.correo,
+        logo_url: form.logo_url,
+        color_principal: form.color_principal,
+        slogan: form.slogan,
+        tipo: form.tipo,
+        propina_ley: form.propina_ley,
+        itbis_ley: form.itbis_ley,
+      };
+
+      // =================================================
       // EDITAR
-      // ==========================================
+      // =================================================
 
       if (empresaEditando) {
-        await api.put(`/empresas/${empresaEditando.id}`, {
-          nombre: form.nombre,
-          slogan: form.slogan,
-          rnc: form.rnc,
-          telefono: form.telefono,
-          direccion: form.direccion,
-          correo: form.correo,
-          logo_url: form.logo_url,
-          color_principal: form.color_principal,
-          tipo: form.tipo,
-          propina_ley: form.propina_ley,
-          itbis_ley: form.itbis_ley,
-        });
+        await api.put(`/empresas/${empresaEditando.id}`, datos);
 
         alert("Empresa actualizada correctamente.");
       }
 
-      // ==========================================
+      // =================================================
       // CREAR
-      // ==========================================
+      // =================================================
       else {
-        await api.post("/empresas", form);
+        await api.post("/empresas", {
+          ...datos,
+          admin_nombre: form.admin_nombre,
+          admin_usuario: form.admin_usuario,
+          admin_password: form.admin_password,
+        });
 
         alert("Empresa creada correctamente.");
       }
@@ -259,82 +292,71 @@ function Empresas() {
 
       await cargarEmpresas();
     } catch (error) {
-      console.error(
-        empresaEditando
-          ? "Error al editar empresa:"
-          : "Error al crear empresa:",
-        error,
-      );
+      console.error("Error al guardar empresa:", error);
 
       alert(
-        error.response?.data?.mensaje ||
-          (empresaEditando
-            ? "No fue posible actualizar la empresa."
-            : "No fue posible crear la empresa."),
+        error.response?.data?.mensaje || "No fue posible guardar la empresa.",
       );
     } finally {
       setGuardando(false);
     }
   };
 
-  // ==========================================
-  // ELIMINAR EMPRESA
-  // ==========================================
+  // =====================================================
+  // ELIMINAR / DESACTIVAR EMPRESA
+  // =====================================================
 
   const eliminarEmpresa = async (empresa) => {
     const confirmar = window.confirm(
-      `¿Está seguro de eliminar la empresa "${empresa.nombre}"?\n\n` +
-        "La empresa será desactivada y no se eliminarán sus datos históricos.",
+      `¿Está seguro de desactivar la empresa "${empresa.nombre}"?\n\n` +
+        "La empresa no será eliminada físicamente.",
     );
 
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     try {
       setGuardando(true);
 
       await api.delete(`/empresas/${empresa.id}`);
 
-      alert("Empresa eliminada correctamente.");
+      alert("Empresa desactivada correctamente.");
 
       await cargarEmpresas();
     } catch (error) {
-      console.error("Error al eliminar empresa:", error);
+      console.error("Error al desactivar empresa:", error);
 
       alert(
-        error.response?.data?.mensaje || "No fue posible eliminar la empresa.",
+        error.response?.data?.mensaje ||
+          "No fue posible desactivar la empresa.",
       );
     } finally {
       setGuardando(false);
     }
   };
 
-  // ==========================================
+  // =====================================================
   // REACTIVAR EMPRESA
-  // ==========================================
+  // =====================================================
 
   const reactivarEmpresa = async (empresa) => {
     const confirmar = window.confirm(
       `¿Desea reactivar la empresa "${empresa.nombre}"?`,
     );
 
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     try {
       setGuardando(true);
 
       await api.put(`/empresas/${empresa.id}`, {
         nombre: empresa.nombre,
-        slogan: empresa.slogan || "",
         rnc: empresa.rnc,
         telefono: empresa.telefono,
         direccion: empresa.direccion,
         correo: empresa.correo,
         logo_url: empresa.logo_url,
         color_principal: empresa.color_principal,
+        slogan: empresa.slogan,
         tipo: empresa.tipo || "ESTANDAR",
         propina_ley: empresa.propina_ley === true,
         itbis_ley: empresa.itbis_ley === true,
@@ -355,9 +377,101 @@ function Empresas() {
     }
   };
 
-  // ==========================================
-  // CALCULAR ESTADO DEL MANTENIMIENTO
-  // ==========================================
+  // =====================================================
+  // ABRIR MÓDULOS
+  // =====================================================
+
+  const abrirModulos = async (empresa) => {
+    setEmpresaModulosActual(empresa);
+    setMostrarModalModulos(true);
+    setEmpresaModulos([]);
+    setCargandoModulos(true);
+
+    try {
+      const response = await api.get(`/modulos/empresa/${empresa.id}`);
+
+      setEmpresaModulos(response.data?.modulos || []);
+    } catch (error) {
+      console.error("Error al cargar módulos de la empresa:", error);
+
+      alert(
+        error.response?.data?.mensaje ||
+          "No fue posible cargar los módulos de la empresa.",
+      );
+    } finally {
+      setCargandoModulos(false);
+    }
+  };
+
+  // =====================================================
+  // CERRAR MÓDULOS
+  // =====================================================
+
+  const cerrarModulos = () => {
+    if (guardandoModulo) return;
+
+    setMostrarModalModulos(false);
+    setEmpresaModulosActual(null);
+    setEmpresaModulos([]);
+  };
+
+  // =====================================================
+  // VERIFICAR SI MÓDULO ESTÁ ASIGNADO
+  // =====================================================
+
+  const moduloAsignado = (modulo) => {
+    const encontrado = empresaModulos.find(
+      (item) =>
+        Number(item.id) === Number(modulo.id) || item.codigo === modulo.codigo,
+    );
+
+    return encontrado?.asignado === true;
+  };
+
+  // =====================================================
+  // CAMBIAR MÓDULO
+  // =====================================================
+
+  const cambiarModulo = async (modulo) => {
+    if (!empresaModulosActual || guardandoModulo) {
+      return;
+    }
+
+    const asignado = moduloAsignado(modulo);
+
+    try {
+      setGuardandoModulo(true);
+
+      if (asignado) {
+        await api.delete(
+          `/modulos/empresa/${empresaModulosActual.id}/${modulo.id}`,
+        );
+      } else {
+        await api.post(`/modulos/empresa/${empresaModulosActual.id}/asignar`, {
+          modulo_id: modulo.id,
+        });
+      }
+
+      // Volver a consultar los módulos
+      const response = await api.get(
+        `/modulos/empresa/${empresaModulosActual.id}`,
+      );
+
+      setEmpresaModulos(response.data?.modulos || []);
+    } catch (error) {
+      console.error("Error al cambiar módulo:", error);
+
+      alert(
+        error.response?.data?.mensaje || "No fue posible modificar el módulo.",
+      );
+    } finally {
+      setGuardandoModulo(false);
+    }
+  };
+
+  // =====================================================
+  // ESTADO DEL MANTENIMIENTO
+  // =====================================================
 
   const obtenerEstadoMantenimiento = (empresa) => {
     if (!empresa?.fecha_mantenimiento) {
@@ -423,14 +537,12 @@ function Empresas() {
     };
   };
 
-  // ==========================================
+  // =====================================================
   // FORMATEAR FECHA
-  // ==========================================
+  // =====================================================
 
   const formatearFecha = (fecha) => {
-    if (!fecha) {
-      return "-";
-    }
+    if (!fecha) return "-";
 
     const fechaLocal = new Date(fecha);
 
@@ -445,9 +557,9 @@ function Empresas() {
     });
   };
 
-  // ==========================================
-  // FORMATEAR DINERO
-  // ==========================================
+  // =====================================================
+  // FORMATEAR MONTO
+  // =====================================================
 
   const formatearMonto = (monto) => {
     return Number(monto || 0).toLocaleString("es-DO", {
@@ -456,96 +568,57 @@ function Empresas() {
     });
   };
 
-  // ==========================================
+  // =====================================================
   // ABRIR CONFIGURACIÓN DE MANTENIMIENTO
-  // ==========================================
+  // =====================================================
 
   const abrirMantenimiento = async (empresa) => {
-    try {
-      setEmpresaMantenimiento(empresa);
-
-      setMantenimientoData({
-        fecha_mantenimiento: empresa.fecha_mantenimiento
-          ? String(empresa.fecha_mantenimiento).substring(0, 10)
-          : "",
-        monto_mantenimiento: empresa.monto_mantenimiento ?? 2000,
-      });
-
-      try {
-        const response = await api.get(`/mantenimientos/empresa/${empresa.id}`);
-
-        if (response.data) {
-          setMantenimientoData({
-            fecha_mantenimiento: response.data.fecha_mantenimiento
-              ? String(response.data.fecha_mantenimiento).substring(0, 10)
-              : empresa.fecha_mantenimiento
-                ? String(empresa.fecha_mantenimiento).substring(0, 10)
-                : "",
-            monto_mantenimiento:
-              response.data.monto_mantenimiento ??
-              empresa.monto_mantenimiento ??
-              2000,
-          });
-        }
-      } catch (error) {
-        console.log("No existe configuración de mantenimiento previa.");
-      }
-
-      setMostrarMantenimiento(true);
-    } catch (error) {
-      console.error("Error al abrir mantenimiento:", error);
-    }
-  };
-
-  // ==========================================
-  // CERRAR MANTENIMIENTO
-  // ==========================================
-
-  const cerrarMantenimiento = () => {
-    if (guardandoMantenimiento) {
-      return;
-    }
-
-    setMostrarMantenimiento(false);
-    setEmpresaMantenimiento(null);
+    setEmpresaMantenimiento(empresa);
 
     setMantenimientoData({
-      fecha_mantenimiento: "",
-      monto_mantenimiento: 2000,
+      fecha_mantenimiento: empresa.fecha_mantenimiento
+        ? String(empresa.fecha_mantenimiento).substring(0, 10)
+        : "",
+      monto_mantenimiento: empresa.monto_mantenimiento ?? 2000,
     });
-  };
 
-  // ==========================================
-  // CAMBIAR MANTENIMIENTO
-  // ==========================================
+    setMostrarMantenimiento(true);
 
-  const cambiarMantenimiento = (e) => {
-    const { name, value } = e.target;
+    try {
+      const response = await api.get(`/mantenimientos/empresa/${empresa.id}`);
 
-    setMantenimientoData((anterior) => ({
-      ...anterior,
-      [name]: value,
-    }));
-  };
-
-  // ==========================================
-  // GUARDAR CONFIGURACIÓN DE MANTENIMIENTO
-  // ==========================================
-
-  const guardarConfiguracionMantenimiento = async () => {
-    if (!empresaMantenimiento) {
-      return;
+      if (response.data) {
+        setMantenimientoData({
+          fecha_mantenimiento: response.data.fecha_mantenimiento
+            ? String(response.data.fecha_mantenimiento).substring(0, 10)
+            : "",
+          monto_mantenimiento:
+            response.data.monto_mantenimiento ??
+            empresa.monto_mantenimiento ??
+            2000,
+        });
+      }
+    } catch (error) {
+      console.log("No existe configuración previa de mantenimiento.");
     }
+  };
+
+  // =====================================================
+  // GUARDAR CONFIGURACIÓN DE MANTENIMIENTO
+  // =====================================================
+
+  const guardarMantenimiento = async () => {
+    if (!empresaMantenimiento) return;
 
     if (!mantenimientoData.fecha_mantenimiento) {
-      alert("Debe indicar la fecha del mantenimiento.");
+      alert("Debe indicar la fecha de mantenimiento.");
       return;
     }
 
     const monto = Number(mantenimientoData.monto_mantenimiento);
 
     if (Number.isNaN(monto) || monto < 0) {
-      alert("El monto del mantenimiento no es válido.");
+      alert("El monto de mantenimiento no es válido.");
       return;
     }
 
@@ -559,7 +632,7 @@ function Empresas() {
 
       alert("Configuración de mantenimiento guardada correctamente.");
 
-      cerrarMantenimiento();
+      setMostrarMantenimiento(false);
 
       await cargarEmpresas();
     } catch (error) {
@@ -572,107 +645,67 @@ function Empresas() {
     } finally {
       setGuardandoMantenimiento(false);
     }
-  }; // ==========================================
-  // CARGAR HISTORIAL DE MANTENIMIENTO
-  // ==========================================
+  };
 
-  const cargarHistorialMantenimiento = async (empresaId) => {
-    if (!empresaId) {
-      return;
-    }
+  // =====================================================
+  // ABRIR HISTORIAL
+  // =====================================================
+
+  const abrirHistorial = async (empresa) => {
+    setEmpresaMantenimiento(empresa);
+    setMostrarHistorial(true);
+    setHistorialMantenimiento([]);
+    setCargandoHistorial(true);
 
     try {
-      setCargandoHistorial(true);
-
       const response = await api.get(
-        `/mantenimientos/empresa/${empresaId}/historial`,
+        `/mantenimientos/empresa/${empresa.id}/historial`,
       );
 
       setHistorialMantenimiento(response.data || []);
     } catch (error) {
-      console.error("Error al cargar historial de mantenimiento:", error);
+      console.error("Error al cargar historial:", error);
 
-      setHistorialMantenimiento([]);
+      alert(
+        error.response?.data?.mensaje || "No fue posible cargar el historial.",
+      );
     } finally {
       setCargandoHistorial(false);
     }
   };
 
-  // ==========================================
-  // ABRIR REGISTRO / HISTORIAL
-  // ==========================================
+  // =====================================================
+  // ABRIR REGISTRO DE MANTENIMIENTO
+  // =====================================================
 
-  const abrirRegistrarMantenimiento = async (empresa) => {
-    if (!empresa) {
-      return;
-    }
-
+  const abrirRegistrarMantenimiento = (empresa) => {
     setEmpresaMantenimiento(empresa);
 
     setRegistroMantenimiento({
       fecha_mantenimiento: new Date().toISOString().substring(0, 10),
-      monto: empresa.monto_mantenimiento || 2000,
+      monto: empresa.monto_mantenimiento ?? 2000,
       observaciones: "",
     });
-
-    setHistorialMantenimiento([]);
-
-    await cargarHistorialMantenimiento(empresa.id);
 
     setMostrarRegistrarMantenimiento(true);
   };
 
-  // ==========================================
-  // CERRAR REGISTRO / HISTORIAL
-  // ==========================================
-
-  const cerrarRegistrarMantenimiento = () => {
-    if (guardandoRegistro) {
-      return;
-    }
-
-    setMostrarRegistrarMantenimiento(false);
-    setEmpresaMantenimiento(null);
-    setHistorialMantenimiento([]);
-
-    setRegistroMantenimiento({
-      fecha_mantenimiento: "",
-      monto: 2000,
-      observaciones: "",
-    });
-  };
-
-  // ==========================================
-  // CAMBIAR REGISTRO DE MANTENIMIENTO
-  // ==========================================
-
-  const cambiarRegistroMantenimiento = (e) => {
-    const { name, value } = e.target;
-
-    setRegistroMantenimiento((anterior) => ({
-      ...anterior,
-      [name]: value,
-    }));
-  };
-
-  // ==========================================
-  // REGISTRAR MANTENIMIENTO
-  // ==========================================
+  // =====================================================
+  // REGISTRAR MANTENIMIENTO REALIZADO
+  // =====================================================
 
   const registrarMantenimiento = async () => {
-    if (!empresaMantenimiento) {
-      return;
-    }
+    if (!empresaMantenimiento) return;
 
     if (!registroMantenimiento.fecha_mantenimiento) {
-      alert("Debe indicar la fecha del mantenimiento.");
+      alert("Debe indicar la fecha.");
       return;
     }
 
     const monto = Number(registroMantenimiento.monto);
 
     if (Number.isNaN(monto) || monto < 0) {
-      alert("El monto del mantenimiento no es válido.");
+      alert("El monto no es válido.");
       return;
     }
 
@@ -690,15 +723,9 @@ function Empresas() {
 
       alert("Mantenimiento registrado correctamente.");
 
-      await cargarHistorialMantenimiento(empresaMantenimiento.id);
+      setMostrarRegistrarMantenimiento(false);
 
       await cargarEmpresas();
-
-      setRegistroMantenimiento({
-        fecha_mantenimiento: "",
-        monto: empresaMantenimiento.monto_mantenimiento || 2000,
-        observaciones: "",
-      });
     } catch (error) {
       console.error("Error al registrar mantenimiento:", error);
 
@@ -711,75 +738,45 @@ function Empresas() {
     }
   };
 
-  // ==========================================
-  // ABRIR AVISO MANUAL
-  // ==========================================
+  // =====================================================
+  // AVISO MANUAL
+  // =====================================================
 
-  const abrirAvisoMantenimiento = (empresa) => {
-    if (!empresa) {
-      return;
-    }
-
+  const abrirAviso = (empresa) => {
     const estado = obtenerEstadoMantenimiento(empresa);
 
-    const fechaProximo = estado.fechaProximo
-      ? formatearFecha(estado.fechaProximo)
-      : "No configurado";
-
-    const monto = formatearMonto(empresa.monto_mantenimiento || 0);
-
-    let detalle = "";
+    let mensaje = "";
 
     if (estado.estado === "VENCIDO") {
-      detalle =
-        `El mantenimiento se encuentra vencido hace ` +
-        `${Math.abs(estado.dias)} día(s).`;
+      mensaje =
+        `Hola, le contactamos de parte del sistema. ` +
+        `El mantenimiento de su cuenta se encuentra vencido. ` +
+        `Por favor, comuníquese con nosotros para coordinarlo.`;
     } else if (estado.estado === "HOY") {
-      detalle = "El mantenimiento corresponde realizarlo hoy.";
+      mensaje =
+        `Hola, le contactamos de parte del sistema. ` +
+        `Su mantenimiento corresponde para el día de hoy. ` +
+        `Por favor, comuníquese con nosotros para coordinarlo.`;
     } else if (estado.estado === "PROXIMO") {
-      detalle = `Faltan ${estado.dias} día(s) para el mantenimiento.`;
-    } else if (estado.estado === "NORMAL") {
-      detalle = "El mantenimiento se encuentra programado.";
+      mensaje =
+        `Hola, le contactamos de parte del sistema. ` +
+        `Su mantenimiento está próximo. ` +
+        `La fecha estimada es ${formatearFecha(estado.fechaProximo)}.`;
     } else {
-      detalle = "El mantenimiento aún no ha sido configurado.";
+      mensaje =
+        `Hola, le contactamos de parte del sistema. ` +
+        `Queremos informarle sobre el próximo mantenimiento ` +
+        `de su cuenta.`;
     }
-
-    const mensaje = `Hola, ${empresa.nombre || ""}.
-
-Le recordamos que el mantenimiento de su sistema está programado.
-
-📅 Próximo mantenimiento: ${fechaProximo}
-
-💰 Monto: RD$${monto}
-
-${detalle}
-
-Quedamos atentos para coordinar el mantenimiento.
-
-Saludos.`;
 
     setEmpresaAviso(empresa);
     setMensajeAviso(mensaje);
     setMostrarAviso(true);
   };
 
-  // ==========================================
-  // CERRAR AVISO
-  // ==========================================
-
-  const cerrarAvisoMantenimiento = () => {
-    if (enviandoAviso) {
-      return;
-    }
-
-    setMostrarAviso(false);
-    setEmpresaAviso(null);
-    setMensajeAviso("");
-  };
-
-  // ==========================================
-  // COPIAR MENSAJE
-  // ==========================================
+  // =====================================================
+  // COPIAR AVISO
+  // =====================================================
 
   const copiarMensaje = async () => {
     try {
@@ -787,24 +784,21 @@ Saludos.`;
 
       alert("Mensaje copiado correctamente.");
     } catch (error) {
-      console.error("Error al copiar mensaje:", error);
+      console.error("Error copiando mensaje:", error);
 
-      alert("No fue posible copiar automáticamente el mensaje.");
+      alert("No fue posible copiar el mensaje.");
     }
   };
 
-  // ==========================================
+  // =====================================================
   // ENVIAR NOTIFICACIÓN INTERNA
-  // ==========================================
+  // =====================================================
 
-  const enviarAvisoMantenimiento = async () => {
-    if (!empresaAviso) {
-      alert("No se ha seleccionado ninguna empresa.");
-      return;
-    }
+  const enviarAvisoInterno = async () => {
+    if (!empresaAviso) return;
 
     if (!mensajeAviso.trim()) {
-      alert("Debe escribir un mensaje.");
+      alert("El mensaje no puede estar vacío.");
       return;
     }
 
@@ -813,78 +807,58 @@ Saludos.`;
 
       await api.post("/notificaciones/enviar", {
         empresa_id: empresaAviso.id,
-        titulo: "Mantenimiento",
-        mensaje: mensajeAviso.trim(),
+        titulo: "Aviso de mantenimiento",
+        mensaje: mensajeAviso,
       });
 
-      alert(
-        `Mensaje enviado correctamente a los administradores de ${empresaAviso.nombre}.`,
-      );
+      alert("Notificación enviada al administrador de la empresa.");
 
-      cerrarAvisoMantenimiento();
+      setMostrarAviso(false);
     } catch (error) {
-      console.error("Error al enviar aviso:", error);
+      console.error("Error enviando notificación:", error);
 
       alert(
-        error.response?.data?.mensaje || "No fue posible enviar el mensaje.",
+        error.response?.data?.mensaje ||
+          "No fue posible enviar la notificación.",
       );
     } finally {
       setEnviandoAviso(false);
     }
   };
 
-  // ==========================================
+  // =====================================================
   // ABRIR WHATSAPP
-  // ==========================================
+  // =====================================================
 
-  const abrirWhatsAppMantenimiento = () => {
-    if (!empresaAviso) {
-      return;
-    }
-
-    if (!empresaAviso.telefono) {
+  const abrirWhatsApp = () => {
+    if (!empresaAviso?.telefono) {
       alert("Esta empresa no tiene un número de teléfono registrado.");
-
       return;
     }
 
     const telefono = String(empresaAviso.telefono).replace(/\D/g, "");
 
     if (!telefono) {
-      alert("El teléfono registrado de esta empresa no es válido.");
-
+      alert("El teléfono de la empresa no es válido.");
       return;
     }
 
-    // República Dominicana
-    // Si tiene 10 dígitos agregamos +1
-    const telefonoWhatsApp = telefono.length === 10 ? `1${telefono}` : telefono;
-
     const url =
-      `https://wa.me/${telefonoWhatsApp}?text=` +
-      encodeURIComponent(mensajeAviso);
+      `https://wa.me/${telefono}?text=` + encodeURIComponent(mensajeAviso);
 
     window.open(url, "_blank");
   };
 
-  // ==========================================
-  // CAMBIAR MENSAJE
-  // ==========================================
-
-  const cambiarMensajeAviso = (e) => {
-    setMensajeAviso(e.target.value);
-  };
-
-  // ==========================================
+  // =====================================================
   // RENDER
-  // ==========================================
+  // =====================================================
 
   return (
     <>
       <div className="container mt-4">
-        {/* ==========================================
+        {/* =================================================
             ENCABEZADO
-        ========================================== */}
+        ================================================= */}
 
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
@@ -904,14 +878,14 @@ Saludos.`;
           </button>
         </div>
 
-        {/* ==========================================
+        {/* =================================================
             LISTADO
-        ========================================== */}
+        ================================================= */}
 
         {cargando ? (
           <div className="text-center py-5">Cargando empresas...</div>
         ) : (
-          <div className="card shadow">
+          <div className="card shadow-sm">
             <div className="card-body">
               <div className="table-responsive">
                 <table className="table table-striped align-middle">
@@ -929,17 +903,21 @@ Saludos.`;
                   </thead>
 
                   <tbody>
-                    {empresas.length > 0 ? (
+                    {empresas.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="text-center py-4">
+                          No hay empresas registradas
+                        </td>
+                      </tr>
+                    ) : (
                       empresas.map((empresa) => {
                         const mantenimiento =
                           obtenerEstadoMantenimiento(empresa);
 
                         return (
                           <tr key={empresa.id}>
-                            {/* ID */}
                             <td>{empresa.id}</td>
 
-                            {/* EMPRESA */}
                             <td>
                               <strong>{empresa.nombre}</strong>
 
@@ -948,77 +926,38 @@ Saludos.`;
                                   {empresa.slogan}
                                 </div>
                               )}
-
-                              {empresa.created_at && (
-                                <div className="small text-muted">
-                                  Creada: {formatearFecha(empresa.created_at)}
-                                </div>
-                              )}
                             </td>
 
-                            {/* RNC */}
                             <td>{empresa.rnc || "-"}</td>
 
-                            {/* TELÉFONO */}
                             <td>{empresa.telefono || "-"}</td>
 
-                            {/* CORREO */}
                             <td>{empresa.correo || "-"}</td>
 
-                            {/* MANTENIMIENTO */}
                             <td>
                               {mantenimiento.estado === "SIN_CONFIGURAR" ? (
                                 <span className="badge bg-secondary">
                                   Sin configurar
                                 </span>
+                              ) : mantenimiento.estado === "VENCIDO" ? (
+                                <span className="badge bg-danger">Vencido</span>
+                              ) : mantenimiento.estado === "HOY" ? (
+                                <span className="badge bg-danger">Hoy</span>
+                              ) : mantenimiento.estado === "PROXIMO" ? (
+                                <span className="badge bg-warning text-dark">
+                                  Próximo
+                                </span>
                               ) : (
-                                <>
-                                  {mantenimiento.estado === "VENCIDO" && (
-                                    <span className="badge bg-danger">
-                                      🔴 Vencido
-                                    </span>
-                                  )}
+                                <span className="badge bg-success">Normal</span>
+                              )}
 
-                                  {mantenimiento.estado === "HOY" && (
-                                    <span className="badge bg-danger">
-                                      🔴 Hoy
-                                    </span>
-                                  )}
-
-                                  {mantenimiento.estado === "PROXIMO" && (
-                                    <span className="badge bg-warning text-dark">
-                                      🟡 Próximo
-                                    </span>
-                                  )}
-
-                                  {mantenimiento.estado === "NORMAL" && (
-                                    <span className="badge bg-success">
-                                      🟢 Al día
-                                    </span>
-                                  )}
-
-                                  <div className="small mt-1">
-                                    {mantenimiento.fechaProximo
-                                      ? formatearFecha(
-                                          mantenimiento.fechaProximo,
-                                        )
-                                      : "-"}
-                                  </div>
-
-                                  {empresa.monto_mantenimiento !== undefined &&
-                                    empresa.monto_mantenimiento !== null && (
-                                      <div className="small text-muted">
-                                        RD$
-                                        {formatearMonto(
-                                          empresa.monto_mantenimiento,
-                                        )}
-                                      </div>
-                                    )}
-                                </>
+                              {mantenimiento.fechaProximo && (
+                                <div className="small text-muted mt-1">
+                                  {formatearFecha(mantenimiento.fechaProximo)}
+                                </div>
                               )}
                             </td>
 
-                            {/* ESTADO EMPRESA */}
                             <td>
                               {empresa.activo ? (
                                 <span className="badge bg-success">Activa</span>
@@ -1029,66 +968,82 @@ Saludos.`;
                               )}
                             </td>
 
-                            {/* ACCIONES */}
                             <td>
-                              <div className="d-flex gap-2 flex-wrap">
+                              <div className="d-flex flex-wrap gap-1">
+                                {/* EDITAR */}
+
                                 <button
                                   type="button"
-                                  className="btn btn-primary btn-sm"
+                                  className="btn btn-sm btn-outline-primary"
                                   onClick={() => abrirEditar(empresa)}
-                                  disabled={guardando}
+                                  title="Editar empresa"
                                 >
-                                  ✏️ Editar
+                                  ✏️
                                 </button>
+
+                                {/* MÓDULOS */}
 
                                 <button
                                   type="button"
-                                  className="btn btn-warning btn-sm"
+                                  className="btn btn-sm btn-outline-dark"
+                                  onClick={() => abrirModulos(empresa)}
+                                  title="Administrar módulos"
+                                >
+                                  ⚙️
+                                </button>
+
+                                {/* MANTENIMIENTO */}
+
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-warning"
                                   onClick={() => abrirMantenimiento(empresa)}
-                                  disabled={guardando}
+                                  title="Configurar mantenimiento"
                                 >
-                                  🔧 Mantenimiento
+                                  🔧
                                 </button>
+
+                                {/* HISTORIAL */}
 
                                 <button
                                   type="button"
-                                  className="btn btn-info btn-sm"
-                                  onClick={() =>
-                                    abrirRegistrarMantenimiento(empresa)
-                                  }
-                                  disabled={guardando}
+                                  className="btn btn-sm btn-outline-info"
+                                  onClick={() => abrirHistorial(empresa)}
+                                  title="Historial de mantenimiento"
                                 >
-                                  📋 Historial
+                                  📋
                                 </button>
+
+                                {/* AVISO */}
 
                                 <button
                                   type="button"
-                                  className="btn btn-success btn-sm"
-                                  onClick={() =>
-                                    abrirAvisoMantenimiento(empresa)
-                                  }
-                                  disabled={guardando}
+                                  className="btn btn-sm btn-outline-success"
+                                  onClick={() => abrirAviso(empresa)}
+                                  title="Enviar aviso manual"
                                 >
-                                  📱 Avisar
+                                  📲
                                 </button>
+
+                                {/* DESACTIVAR */}
 
                                 {empresa.activo ? (
                                   <button
                                     type="button"
-                                    className="btn btn-danger btn-sm"
+                                    className="btn btn-sm btn-outline-danger"
                                     onClick={() => eliminarEmpresa(empresa)}
-                                    disabled={guardando}
+                                    title="Desactivar empresa"
                                   >
-                                    🗑️ Eliminar
+                                    🗑️
                                   </button>
                                 ) : (
                                   <button
                                     type="button"
-                                    className="btn btn-success btn-sm"
+                                    className="btn btn-sm btn-outline-success"
                                     onClick={() => reactivarEmpresa(empresa)}
-                                    disabled={guardando}
+                                    title="Reactivar empresa"
                                   >
-                                    ↻ Reactivar
+                                    ♻️
                                   </button>
                                 )}
                               </div>
@@ -1096,12 +1051,6 @@ Saludos.`;
                           </tr>
                         );
                       })
-                    ) : (
-                      <tr>
-                        <td colSpan="8" className="text-center py-4">
-                          No hay empresas registradas
-                        </td>
-                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -1109,885 +1058,764 @@ Saludos.`;
             </div>
           </div>
         )}
-        {/* ==========================================
-            MODAL NUEVA / EDITAR EMPRESA
-        ========================================== */}
+      </div>
 
-        {mostrarFormulario && (
-          <div
-            className="modal d-block"
-            tabIndex="-1"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.5)",
-              zIndex: 1050,
-            }}
-          >
-            <div className="modal-dialog modal-lg modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">
-                    {empresaEditando ? "Editar empresa" : "Nueva empresa"}
-                  </h5>
+      {/* =====================================================
+          MODAL NUEVA / EDITAR EMPRESA
+      ===================================================== */}
 
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={cerrarFormulario}
-                    disabled={guardando}
-                  />
-                </div>
+      {mostrarFormulario && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  {empresaEditando ? "Editar empresa" : "Nueva empresa"}
+                </h5>
 
-                <div className="modal-body">
-                  {/* INFORMACIÓN DE LA EMPRESA */}
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={cerrarFormulario}
+                />
+              </div>
 
-                  <h6 className="mb-3">Información de la empresa</h6>
+              <div className="modal-body">
+                <div className="row">
+                  {/* NOMBRE */}
 
-                  <div className="row">
-                    {/* NOMBRE */}
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Nombre</label>
 
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Nombre *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="nombre"
+                      value={form.nombre}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
 
+                  {/* RNC */}
+
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">RNC</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="rnc"
+                      value={form.rnc}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
+
+                  {/* TELÉFONO */}
+
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Teléfono</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="telefono"
+                      value={form.telefono}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
+
+                  {/* CORREO */}
+
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Correo</label>
+
+                    <input
+                      type="email"
+                      className="form-control"
+                      name="correo"
+                      value={form.correo}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
+
+                  {/* DIRECCIÓN */}
+
+                  <div className="col-12 mb-3">
+                    <label className="form-label">Dirección</label>
+
+                    <textarea
+                      className="form-control"
+                      name="direccion"
+                      rows="2"
+                      value={form.direccion}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
+
+                  {/* SLOGAN */}
+
+                  <div className="col-12 mb-3">
+                    <label className="form-label">Slogan</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="slogan"
+                      value={form.slogan}
+                      onChange={cambiarCampo}
+                      placeholder="Ej. Calidad y servicio"
+                    />
+                  </div>
+
+                  {/* LOGO */}
+
+                  <div className="col-md-8 mb-3">
+                    <label className="form-label">URL del logo</label>
+
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="logo_url"
+                      value={form.logo_url}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
+
+                  {/* COLOR */}
+
+                  <div className="col-md-4 mb-3">
+                    <label className="form-label">Color principal</label>
+
+                    <input
+                      type="color"
+                      className="form-control form-control-color"
+                      name="color_principal"
+                      value={form.color_principal || "#198754"}
+                      onChange={cambiarCampo}
+                    />
+                  </div>
+
+                  {/* TIPO */}
+
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Tipo de empresa</label>
+
+                    <select
+                      className="form-select"
+                      name="tipo"
+                      value={form.tipo}
+                      onChange={cambiarCampo}
+                    >
+                      <option value="ESTANDAR">Estándar</option>
+
+                      <option value="FERRETERIA">Ferretería</option>
+                    </select>
+                  </div>
+
+                  {/* OPCIONES */}
+
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Configuración</label>
+
+                    <div className="form-check">
                       <input
-                        type="text"
-                        className="form-control"
-                        name="nombre"
-                        value={form.nombre}
+                        type="checkbox"
+                        className="form-check-input"
+                        id="propina_ley"
+                        name="propina_ley"
+                        checked={form.propina_ley}
                         onChange={cambiarCampo}
-                        placeholder="Nombre de la empresa"
-                        disabled={guardando}
                       />
+
+                      <label className="form-check-label" htmlFor="propina_ley">
+                        Aplicar propina de ley
+                      </label>
                     </div>
 
-                    {/* SLOGAN */}
-
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Slogan</label>
-
+                    <div className="form-check">
                       <input
-                        type="text"
-                        className="form-control"
-                        name="slogan"
-                        value={form.slogan}
+                        type="checkbox"
+                        className="form-check-input"
+                        id="itbis_ley"
+                        name="itbis_ley"
+                        checked={form.itbis_ley}
                         onChange={cambiarCampo}
-                        placeholder="Ej. Calidad y confianza"
-                        disabled={guardando}
                       />
-                    </div>
 
-                    {/* RNC */}
-
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">RNC</label>
-
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="rnc"
-                        value={form.rnc}
-                        onChange={cambiarCampo}
-                        placeholder="RNC"
-                        disabled={guardando}
-                      />
-                    </div>
-
-                    {/* TELÉFONO */}
-
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Teléfono</label>
-
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="telefono"
-                        value={form.telefono}
-                        onChange={cambiarCampo}
-                        placeholder="809-000-0000"
-                        disabled={guardando}
-                      />
-                    </div>
-
-                    {/* CORREO */}
-
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Correo</label>
-
-                      <input
-                        type="email"
-                        className="form-control"
-                        name="correo"
-                        value={form.correo}
-                        onChange={cambiarCampo}
-                        placeholder="correo@empresa.com"
-                        disabled={guardando}
-                      />
-                    </div>
-
-                    {/* DIRECCIÓN */}
-
-                    <div className="col-md-12 mb-3">
-                      <label className="form-label">Dirección</label>
-
-                      <textarea
-                        className="form-control"
-                        name="direccion"
-                        rows="2"
-                        value={form.direccion}
-                        onChange={cambiarCampo}
-                        placeholder="Dirección de la empresa"
-                        disabled={guardando}
-                      />
-                    </div>
-
-                    {/* LOGO */}
-
-                    <div className="col-md-8 mb-3">
-                      <label className="form-label">Logo URL</label>
-
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="logo_url"
-                        value={form.logo_url}
-                        onChange={cambiarCampo}
-                        placeholder="https://..."
-                        disabled={guardando}
-                      />
-                    </div>
-
-                    {/* COLOR */}
-
-                    <div className="col-md-4 mb-3">
-                      <label className="form-label">Color principal</label>
-
-                      <input
-                        type="color"
-                        className="form-control form-control-color w-100"
-                        name="color_principal"
-                        value={form.color_principal}
-                        onChange={cambiarCampo}
-                        disabled={guardando}
-                      />
-                    </div>
-
-                    {/* TIPO */}
-
-                    <div className="col-md-12 mb-3">
-                      <label className="form-label">Tipo de empresa *</label>
-
-                      <select
-                        className="form-select"
-                        name="tipo"
-                        value={form.tipo}
-                        onChange={cambiarCampo}
-                        disabled={guardando}
-                      >
-                        <option value="ESTANDAR">Empresa estándar</option>
-
-                        <option value="FERRETERIA">Ferretería</option>
-                      </select>
-
-                      <div className="form-text">
-                        Define los módulos y el menú que tendrá esta empresa.
-                      </div>
+                      <label className="form-check-label" htmlFor="itbis_ley">
+                        Aplicar ITBIS
+                      </label>
                     </div>
                   </div>
 
-                  <hr />
-
-                  {/* CARACTERÍSTICAS */}
-
-                  <h6 className="mb-3">Características de la empresa</h6>
-
-                  <div className="card border-0 bg-light mb-4">
-                    <div className="card-body">
-                      {/* PROPINA */}
-
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id="propina_ley"
-                          name="propina_ley"
-                          checked={form.propina_ley}
-                          onChange={cambiarCampo}
-                          disabled={guardando}
-                        />
-
-                        <label
-                          className="form-check-label fw-semibold"
-                          htmlFor="propina_ley"
-                        >
-                          Habilitar propina de ley (10%)
-                        </label>
-                      </div>
-
-                      <div className="form-text">
-                        Permite que esta empresa pueda aplicar una propina del
-                        10%.
-                      </div>
-
-                      <hr />
-
-                      {/* ITBIS */}
-
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id="itbis_ley"
-                          name="itbis_ley"
-                          checked={form.itbis_ley}
-                          onChange={cambiarCampo}
-                          disabled={guardando}
-                        />
-
-                        <label
-                          className="form-check-label fw-semibold"
-                          htmlFor="itbis_ley"
-                        >
-                          Habilitar ITBIS (18%)
-                        </label>
-                      </div>
-
-                      <div className="form-text">
-                        Permite que esta empresa pueda aplicar ITBIS del 18%.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ADMINISTRADOR */}
+                  {/* ADMINISTRADOR SOLO CREAR */}
 
                   {!empresaEditando && (
                     <>
-                      <h6 className="mb-3">Administrador de la empresa</h6>
+                      <hr className="my-3" />
 
-                      <div className="row">
-                        {/* NOMBRE ADMIN */}
+                      <div className="col-12">
+                        <h6>Administrador de la empresa</h6>
+                      </div>
 
-                        <div className="col-md-6 mb-3">
-                          <label className="form-label">
-                            Nombre del administrador *
-                          </label>
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label">Nombre</label>
 
-                          <input
-                            type="text"
-                            className="form-control"
-                            name="admin_nombre"
-                            value={form.admin_nombre}
-                            onChange={cambiarCampo}
-                            placeholder="Nombre completo"
-                            disabled={guardando}
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          className="form-control"
+                          name="admin_nombre"
+                          value={form.admin_nombre}
+                          onChange={cambiarCampo}
+                        />
+                      </div>
 
-                        {/* USUARIO */}
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label">Usuario</label>
 
-                        <div className="col-md-6 mb-3">
-                          <label className="form-label">Usuario *</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          name="admin_usuario"
+                          value={form.admin_usuario}
+                          onChange={cambiarCampo}
+                        />
+                      </div>
 
-                          <input
-                            type="text"
-                            className="form-control"
-                            name="admin_usuario"
-                            value={form.admin_usuario}
-                            onChange={cambiarCampo}
-                            placeholder="usuario"
-                            disabled={guardando}
-                          />
-                        </div>
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label">Contraseña</label>
 
-                        {/* CONTRASEÑA */}
-
-                        <div className="col-md-6 mb-3">
-                          <label className="form-label">Contraseña *</label>
-
-                          <input
-                            type="password"
-                            className="form-control"
-                            name="admin_password"
-                            value={form.admin_password}
-                            onChange={cambiarCampo}
-                            placeholder="Contraseña"
-                            disabled={guardando}
-                          />
-                        </div>
+                        <input
+                          type="password"
+                          className="form-control"
+                          name="admin_password"
+                          value={form.admin_password}
+                          onChange={cambiarCampo}
+                        />
                       </div>
                     </>
                   )}
                 </div>
+              </div>
 
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={cerrarFormulario}
-                    disabled={guardando}
-                  >
-                    Cancelar
-                  </button>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={cerrarFormulario}
+                  disabled={guardando}
+                >
+                  Cancelar
+                </button>
 
-                  <button
-                    type="button"
-                    className={
-                      empresaEditando ? "btn btn-primary" : "btn btn-success"
-                    }
-                    onClick={guardarEmpresa}
-                    disabled={guardando}
-                  >
-                    {guardando
-                      ? "Guardando..."
-                      : empresaEditando
-                        ? "Guardar cambios"
-                        : "Crear empresa"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={guardarEmpresa}
+                  disabled={guardando}
+                >
+                  {guardando
+                    ? "Guardando..."
+                    : empresaEditando
+                      ? "Guardar cambios"
+                      : "Crear empresa"}
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ==========================================
-            MODAL CONFIGURACIÓN DE MANTENIMIENTO
-        ========================================== */}
+      {/* =====================================================
+          MODAL MÓDULOS
+      ===================================================== */}
 
-        {mostrarMantenimiento && empresaMantenimiento && (
-          <div
-            className="modal d-block"
-            tabIndex="-1"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.6)",
-              zIndex: 1100,
-            }}
-          >
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">🔧 Mantenimiento</h5>
+      {mostrarModalModulos && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="modal-dialog modal-md">
+            <div className="modal-content">
+              <div className="modal-header">
+                <div>
+                  <h5 className="modal-title">Módulos de la empresa</h5>
 
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={cerrarMantenimiento}
-                    disabled={guardandoMantenimiento}
-                  />
+                  <div className="text-muted small">
+                    {empresaModulosActual?.nombre}
+                  </div>
                 </div>
 
-                <div className="modal-body">
-                  <div className="alert alert-light border">
-                    <strong>{empresaMantenimiento.nombre}</strong>
-
-                    <div className="small text-muted mt-1">
-                      ID: {empresaMantenimiento.id}
-                    </div>
-
-                    {empresaMantenimiento.created_at && (
-                      <div className="small text-muted">
-                        Creada:{" "}
-                        {formatearFecha(empresaMantenimiento.created_at)}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* FECHA */}
-
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Fecha del último mantenimiento
-                    </label>
-
-                    <input
-                      type="date"
-                      className="form-control"
-                      name="fecha_mantenimiento"
-                      value={mantenimientoData.fecha_mantenimiento}
-                      onChange={cambiarMantenimiento}
-                      disabled={guardandoMantenimiento}
-                    />
-
-                    <div className="form-text">
-                      El sistema calculará el próximo mantenimiento 6 meses
-                      después de esta fecha.
-                    </div>
-                  </div>
-
-                  {/* MONTO */}
-
-                  <div className="mb-3">
-                    <label className="form-label">
-                      Monto del mantenimiento
-                    </label>
-
-                    <div className="input-group">
-                      <span className="input-group-text">RD$</span>
-
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="form-control"
-                        name="monto_mantenimiento"
-                        value={mantenimientoData.monto_mantenimiento}
-                        onChange={cambiarMantenimiento}
-                        disabled={guardandoMantenimiento}
-                      />
-                    </div>
-                  </div>
-
-                  {/* PRÓXIMO */}
-
-                  {empresaMantenimiento.fecha_mantenimiento && (
-                    <div className="alert alert-info">
-                      <strong>Próximo mantenimiento:</strong>
-
-                      <br />
-
-                      {formatearFecha(
-                        obtenerEstadoMantenimiento(empresaMantenimiento)
-                          .fechaProximo,
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={cerrarMantenimiento}
-                    disabled={guardandoMantenimiento}
-                  >
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-warning"
-                    onClick={guardarConfiguracionMantenimiento}
-                    disabled={guardandoMantenimiento}
-                  >
-                    {guardandoMantenimiento
-                      ? "Guardando..."
-                      : "💾 Guardar mantenimiento"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={cerrarModulos}
+                  disabled={guardandoModulo}
+                />
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* ==========================================
-            MODAL HISTORIAL / REGISTRAR MANTENIMIENTO
-        ========================================== */}
-
-        {mostrarRegistrarMantenimiento && empresaMantenimiento && (
-          <div
-            className="modal d-block"
-            tabIndex="-1"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.65)",
-              zIndex: 1150,
-            }}
-          >
-            <div className="modal-dialog modal-xl modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <div>
-                    <h5 className="modal-title">
-                      📋 Historial de mantenimiento
-                    </h5>
-
-                    <div className="small text-muted">
-                      {empresaMantenimiento.nombre}
-                    </div>
+              <div className="modal-body">
+                {cargandoModulos ? (
+                  <div className="text-center py-4">Cargando módulos...</div>
+                ) : modulos.length === 0 ? (
+                  <div className="alert alert-warning">
+                    No hay módulos disponibles.
                   </div>
-
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={cerrarRegistrarMantenimiento}
-                    disabled={guardandoRegistro}
-                  />
-                </div>
-
-                <div className="modal-body">
-                  {/* REGISTRAR NUEVO */}
-
-                  <div className="card mb-4">
-                    <div className="card-header">
-                      <strong>Registrar mantenimiento</strong>
-                    </div>
-
-                    <div className="card-body">
-                      <div className="row">
-                        {/* FECHA */}
-
-                        <div className="col-md-4 mb-3">
-                          <label className="form-label">
-                            Fecha del mantenimiento
-                          </label>
-
-                          <input
-                            type="date"
-                            className="form-control"
-                            name="fecha_mantenimiento"
-                            value={registroMantenimiento.fecha_mantenimiento}
-                            onChange={cambiarRegistroMantenimiento}
-                            disabled={guardandoRegistro}
-                          />
-                        </div>
-
-                        {/* MONTO */}
-
-                        <div className="col-md-4 mb-3">
-                          <label className="form-label">Monto</label>
-
-                          <div className="input-group">
-                            <span className="input-group-text">RD$</span>
-
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              className="form-control"
-                              name="monto"
-                              value={registroMantenimiento.monto}
-                              onChange={cambiarRegistroMantenimiento}
-                              disabled={guardandoRegistro}
-                            />
-                          </div>
-                        </div>
-
-                        {/* OBSERVACIONES */}
-
-                        <div className="col-md-4 mb-3">
-                          <label className="form-label">Observaciones</label>
-
-                          <input
-                            type="text"
-                            className="form-control"
-                            name="observaciones"
-                            value={registroMantenimiento.observaciones}
-                            onChange={cambiarRegistroMantenimiento}
-                            placeholder="Ej. Mantenimiento realizado"
-                            disabled={guardandoRegistro}
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={registrarMantenimiento}
-                        disabled={guardandoRegistro}
-                      >
-                        {guardandoRegistro
-                          ? "Registrando..."
-                          : "💾 Registrar mantenimiento"}
-                      </button>
-                    </div>
-                  </div>
-                  {/* ==========================================
-                        HISTORIAL
-                    ========================================== */}
-
-                  <div className="card">
-                    <div className="card-header">
-                      <strong>Historial</strong>
-                    </div>
-
-                    <div className="card-body">
-                      {cargandoHistorial ? (
-                        <div className="text-center py-3">
-                          Cargando historial...
-                        </div>
-                      ) : historialMantenimiento.length === 0 ? (
-                        <div className="alert alert-light border mb-0">
-                          No hay mantenimientos registrados para esta empresa.
-                        </div>
-                      ) : (
-                        <div className="table-responsive">
-                          <table className="table table-striped table-hover align-middle mb-0">
-                            <thead>
-                              <tr>
-                                <th>Fecha</th>
-                                <th>Próximo</th>
-                                <th>Monto</th>
-                                <th>Estado</th>
-                                <th>Observaciones</th>
-                                <th>Registrado</th>
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              {historialMantenimiento.map((registro, index) => (
-                                <tr key={registro.id || index}>
-                                  <td>
-                                    {formatearFecha(
-                                      registro.fecha_mantenimiento,
-                                    )}
-                                  </td>
-
-                                  <td>
-                                    {formatearFecha(
-                                      registro.proximo_mantenimiento,
-                                    )}
-                                  </td>
-
-                                  <td>
-                                    RD$
-                                    {formatearMonto(registro.monto)}
-                                  </td>
-
-                                  <td>
-                                    {registro.estado === "VENCIDO" ? (
-                                      <span className="badge bg-danger">
-                                        Vencido
-                                      </span>
-                                    ) : registro.estado === "PROXIMO" ? (
-                                      <span className="badge bg-warning text-dark">
-                                        Próximo
-                                      </span>
-                                    ) : (
-                                      <span className="badge bg-success">
-                                        Completado
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  <td>{registro.observaciones || "-"}</td>
-
-                                  <td>{formatearFecha(registro.created_at)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={cerrarRegistrarMantenimiento}
-                    disabled={guardandoRegistro}
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==========================================
-            POPUP AVISO MANUAL
-        ========================================== */}
-
-        {mostrarAviso && empresaAviso && (
-          <div
-            className="modal d-block"
-            tabIndex="-1"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.65)",
-              zIndex: 1200,
-            }}
-          >
-            <div className="modal-dialog modal-lg modal-dialog-centered">
-              <div className="modal-content">
-                {/* HEADER */}
-
-                <div className="modal-header">
-                  <div>
-                    <h5 className="modal-title">📱 Avisar mantenimiento</h5>
-
-                    <div className="small text-muted">Aviso manual</div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={cerrarAvisoMantenimiento}
-                    disabled={enviandoAviso}
-                  />
-                </div>
-
-                {/* BODY */}
-
-                <div className="modal-body">
-                  {/* INFORMACIÓN EMPRESA */}
-
-                  <div className="alert alert-primary">
-                    <div className="fw-bold fs-5">{empresaAviso.nombre}</div>
-
-                    <div className="mt-2">
-                      <strong>Teléfono:</strong>{" "}
-                      {empresaAviso.telefono || "No registrado"}
-                    </div>
-
-                    {empresaAviso.correo && (
-                      <div>
-                        <strong>Correo:</strong> {empresaAviso.correo}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* INFORMACIÓN DEL MANTENIMIENTO */}
-
-                  <div className="row mb-3">
-                    {/* PRÓXIMO */}
-
-                    <div className="col-md-6 mb-3">
-                      <div className="card h-100">
-                        <div className="card-body">
-                          <div className="text-muted small">
-                            PRÓXIMO MANTENIMIENTO
-                          </div>
-
-                          <div className="fw-bold fs-5">
-                            {empresaAviso.fecha_mantenimiento
-                              ? formatearFecha(
-                                  obtenerEstadoMantenimiento(empresaAviso)
-                                    .fechaProximo,
-                                )
-                              : "No configurado"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* MONTO */}
-
-                    <div className="col-md-6 mb-3">
-                      <div className="card h-100">
-                        <div className="card-body">
-                          <div className="text-muted small">MONTO</div>
-
-                          <div className="fw-bold fs-5">
-                            RD$
-                            {formatearMonto(empresaAviso.monto_mantenimiento)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ESTADO */}
-
-                  <div className="mb-3">
-                    <label className="form-label fw-bold">Estado actual</label>
-
-                    {(() => {
-                      const estado = obtenerEstadoMantenimiento(empresaAviso);
-
-                      if (estado.estado === "VENCIDO") {
-                        return (
-                          <div className="alert alert-danger mb-0">
-                            🔴 El mantenimiento está vencido hace{" "}
-                            {Math.abs(estado.dias)} día(s).
-                          </div>
-                        );
-                      }
-
-                      if (estado.estado === "HOY") {
-                        return (
-                          <div className="alert alert-danger mb-0">
-                            🔴 El mantenimiento corresponde realizarlo hoy.
-                          </div>
-                        );
-                      }
-
-                      if (estado.estado === "PROXIMO") {
-                        return (
-                          <div className="alert alert-warning mb-0">
-                            🟡 Faltan {estado.dias} día(s) para el
-                            mantenimiento.
-                          </div>
-                        );
-                      }
-
-                      if (estado.estado === "SIN_CONFIGURAR") {
-                        return (
-                          <div className="alert alert-secondary mb-0">
-                            ⚪ El mantenimiento todavía no está configurado.
-                          </div>
-                        );
-                      }
+                ) : (
+                  <div className="row g-3">
+                    {modulos.map((modulo) => {
+                      const activo = moduloAsignado(modulo);
 
                       return (
-                        <div className="alert alert-success mb-0">
-                          🟢 El mantenimiento está programado.
+                        <div className="col-12" key={modulo.id}>
+                          <div
+                            className={`border rounded p-3 ${
+                              activo ? "border-success bg-light" : ""
+                            }`}
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div>
+                                <div className="fw-bold">
+                                  {modulo.icono ? `${modulo.icono} ` : ""}
+
+                                  {modulo.nombre}
+                                </div>
+
+                                {modulo.descripcion && (
+                                  <div className="small text-muted mt-1">
+                                    {modulo.descripcion}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="form-check form-switch">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  role="switch"
+                                  checked={activo}
+                                  disabled={guardandoModulo}
+                                  onChange={() => cambiarModulo(modulo)}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-2">
+                              {activo ? (
+                                <span className="badge bg-success">Activo</span>
+                              ) : (
+                                <span className="badge bg-secondary">
+                                  Inactivo
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
-                    })()}
+                    })}
                   </div>
+                )}
+              </div>
 
-                  {/* MENSAJE */}
-
-                  <div className="mb-3">
-                    <label className="form-label fw-bold">Mensaje</label>
-
-                    <textarea
-                      className="form-control"
-                      rows="10"
-                      value={mensajeAviso}
-                      onChange={cambiarMensajeAviso}
-                      disabled={enviandoAviso}
-                    />
-
-                    <div className="form-text">
-                      Puedes modificar el mensaje antes de enviarlo.
-                    </div>
-                  </div>
+              <div className="modal-footer">
+                <div className="me-auto text-muted small">
+                  Los cambios se guardan automáticamente.
                 </div>
 
-                {/* FOOTER */}
-
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={cerrarAvisoMantenimiento}
-                    disabled={enviandoAviso}
-                  >
-                    Cerrar
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={copiarMensaje}
-                    disabled={enviandoAviso}
-                  >
-                    📋 Copiar mensaje
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={enviarAvisoMantenimiento}
-                    disabled={enviandoAviso || !mensajeAviso.trim()}
-                  >
-                    {enviandoAviso ? "Enviando..." : "📩 Enviar mensaje"}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-success"
-                    onClick={abrirWhatsAppMantenimiento}
-                    disabled={enviandoAviso || !empresaAviso.telefono}
-                  >
-                    💬 Abrir WhatsApp
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={cerrarModulos}
+                  disabled={guardandoModulo}
+                >
+                  Cerrar
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          MODAL CONFIGURACIÓN MANTENIMIENTO
+      ===================================================== */}
+
+      {mostrarMantenimiento && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Mantenimiento</h5>
+
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setMostrarMantenimiento(false)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  <strong>{empresaMantenimiento?.nombre}</strong>
+                  <br />
+                  El sistema calcula el próximo mantenimiento a 6 meses de la
+                  fecha indicada.
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Fecha de mantenimiento</label>
+
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={mantenimientoData.fecha_mantenimiento}
+                    onChange={(e) =>
+                      setMantenimientoData((anterior) => ({
+                        ...anterior,
+                        fecha_mantenimiento: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Monto de mantenimiento</label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="form-control"
+                    value={mantenimientoData.monto_mantenimiento}
+                    onChange={(e) =>
+                      setMantenimientoData((anterior) => ({
+                        ...anterior,
+                        monto_mantenimiento: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setMostrarMantenimiento(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={guardarMantenimiento}
+                  disabled={guardandoMantenimiento}
+                >
+                  {guardandoMantenimiento
+                    ? "Guardando..."
+                    : "Guardar configuración"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          MODAL HISTORIAL
+      ===================================================== */}
+
+      {mostrarHistorial && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Historial de mantenimiento</h5>
+
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setMostrarHistorial(false)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <strong>{empresaMantenimiento?.nombre}</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-success"
+                    onClick={() =>
+                      abrirRegistrarMantenimiento(empresaMantenimiento)
+                    }
+                  >
+                    + Registrar mantenimiento
+                  </button>
+                </div>
+
+                {cargandoHistorial ? (
+                  <div className="text-center py-4">Cargando historial...</div>
+                ) : historialMantenimiento.length === 0 ? (
+                  <div className="alert alert-info">
+                    No hay mantenimientos registrados.
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-striped">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Próximo</th>
+                          <th>Monto</th>
+                          <th>Estado</th>
+                          <th>Observaciones</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {historialMantenimiento.map((item) => (
+                          <tr key={item.id}>
+                            <td>{formatearFecha(item.fecha_mantenimiento)}</td>
+
+                            <td>
+                              {formatearFecha(item.proximo_mantenimiento)}
+                            </td>
+
+                            <td>
+                              RD$
+                              {formatearMonto(item.monto)}
+                            </td>
+
+                            <td>{item.estado || "-"}</td>
+
+                            <td>{item.observaciones || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setMostrarHistorial(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          MODAL REGISTRAR MANTENIMIENTO
+      ===================================================== */}
+
+      {mostrarRegistrarMantenimiento && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Registrar mantenimiento</h5>
+
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setMostrarRegistrarMantenimiento(false)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label">Fecha</label>
+
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={registroMantenimiento.fecha_mantenimiento}
+                    onChange={(e) =>
+                      setRegistroMantenimiento((anterior) => ({
+                        ...anterior,
+                        fecha_mantenimiento: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Monto</label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="form-control"
+                    value={registroMantenimiento.monto}
+                    onChange={(e) =>
+                      setRegistroMantenimiento((anterior) => ({
+                        ...anterior,
+                        monto: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Observaciones</label>
+
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={registroMantenimiento.observaciones}
+                    onChange={(e) =>
+                      setRegistroMantenimiento((anterior) => ({
+                        ...anterior,
+                        observaciones: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setMostrarRegistrarMantenimiento(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={registrarMantenimiento}
+                  disabled={guardandoRegistro}
+                >
+                  {guardandoRegistro ? "Registrando..." : "Registrar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          MODAL AVISO MANUAL
+      ===================================================== */}
+
+      {mostrarAviso && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Aviso de mantenimiento</h5>
+
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setMostrarAviso(false)}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="mb-3">
+                  <strong>Empresa:</strong> {empresaAviso?.nombre}
+                </div>
+
+                <label className="form-label">Mensaje</label>
+
+                <textarea
+                  className="form-control"
+                  rows="7"
+                  value={mensajeAviso}
+                  onChange={(e) => setMensajeAviso(e.target.value)}
+                />
+
+                <div className="form-text">
+                  Puedes modificar el mensaje antes de enviarlo.
+                </div>
+              </div>
+
+              <div className="modal-footer d-flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={copiarMensaje}
+                >
+                  📋 Copiar
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={abrirWhatsApp}
+                >
+                  WhatsApp
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={enviarAvisoInterno}
+                  disabled={enviandoAviso}
+                >
+                  {enviandoAviso ? "Enviando..." : "Enviar al sistema"}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setMostrarAviso(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
