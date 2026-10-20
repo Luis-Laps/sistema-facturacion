@@ -558,6 +558,55 @@ router.post("/", validarToken, async (req, res) => {
 });
 
 // ==========================================
+// HISTORIAL DE FACTURAS ELIMINADAS
+// SOLO ADMIN Y SUPER_ADMIN
+// ==========================================
+
+router.get("/eliminadas", validarToken, async (req, res) => {
+  if (req.usuario.rol !== "ADMIN" && req.usuario.rol !== "SUPER_ADMIN") {
+    return res.status(403).json({
+      mensaje: "No tienes permisos para consultar las facturas eliminadas.",
+    });
+  }
+
+  try {
+    const resultado = await pool.query(
+      `
+      SELECT
+        id,
+        empresa_id,
+        factura_id,
+        numero_factura,
+        usuario_id,
+        usuario,
+        usuario_nombre,
+        rol_usuario,
+        motivo,
+        eliminado_en,
+        ip,
+        user_agent,
+        factura_data,
+        detalle_data
+      FROM facturas_eliminadas_auditoria
+      WHERE empresa_id = $1
+      ORDER BY eliminado_en DESC, id DESC
+      `,
+      [req.usuario.empresa_id],
+    );
+
+    return res.json({
+      facturas: resultado.rows,
+    });
+  } catch (error) {
+    console.error("Error al consultar facturas eliminadas:", error);
+
+    return res.status(500).json({
+      mensaje: "Error al consultar el historial de facturas eliminadas.",
+    });
+  }
+});
+
+// ==========================================
 // OBTENER FACTURAS
 // ==========================================
 
@@ -725,6 +774,20 @@ router.delete("/:id", validarToken, async (req, res) => {
     });
   }
 
+  const motivo = String(req.body?.motivo || "").trim();
+
+  if (!motivo) {
+    return res.status(400).json({
+      mensaje: "Debes indicar el motivo de la eliminación.",
+    });
+  }
+
+  if (motivo.length < 5) {
+    return res.status(400).json({
+      mensaje: "El motivo debe tener al menos 5 caracteres.",
+    });
+  }
+
   const client = await pool.connect();
 
   try {
@@ -768,6 +831,84 @@ router.delete("/:id", validarToken, async (req, res) => {
       [id, req.usuario.empresa_id],
     );
 
+    // ========================================
+    // GUARDAR AUDITORÍA ANTES DE ELIMINAR
+    // ========================================
+
+    const usuarioAuditoria = await client.query(
+      `
+  SELECT
+    id,
+    usuario,
+    nombre,
+    rol
+  FROM usuarios
+  WHERE id = $1
+  AND empresa_id = $2
+  `,
+      [req.usuario.id, req.usuario.empresa_id],
+    );
+
+    const usuarioActual = usuarioAuditoria.rows[0];
+
+    if (!usuarioActual) {
+      throw new Error(
+        "No fue posible identificar al usuario que elimina la factura.",
+      );
+    }
+
+    await client.query(
+      `
+  INSERT INTO facturas_eliminadas_auditoria (
+    empresa_id,
+    factura_id,
+    numero_factura,
+    usuario_id,
+    usuario,
+    usuario_nombre,
+    rol_usuario,
+    motivo,
+    eliminado_en,
+    ip,
+    user_agent,
+    factura_data,
+    detalle_data
+  )
+  VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    NOW(),
+    $9,
+    $10,
+    $11::jsonb,
+    $12::jsonb
+  )
+  `,
+      [
+        req.usuario.empresa_id,
+        facturaActual.id,
+        facturaActual.numero_factura,
+
+        usuarioActual.id,
+        usuarioActual.usuario,
+        usuarioActual.nombre,
+        usuarioActual.rol,
+
+        motivo,
+
+        req.ip || null,
+        req.get("user-agent") || null,
+
+        JSON.stringify(facturaActual),
+        JSON.stringify(detalle.rows),
+      ],
+    );
     // ========================================
     // DEVOLVER INVENTARIO
     // ========================================

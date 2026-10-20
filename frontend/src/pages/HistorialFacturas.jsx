@@ -51,37 +51,58 @@ function HistorialFacturas() {
   };
 
   const eliminarFactura = async (id) => {
-    const confirmar = await Swal.fire({
+    const resultado = await Swal.fire({
       title: "¿Eliminar factura?",
-      text: "Esta acción devolverá el inventario y eliminará la venta.",
+      text: "Esta acción devolverá el inventario y eliminará la venta. Indica el motivo para continuar.",
       icon: "warning",
+      input: "textarea",
+      inputLabel: "Motivo de eliminación",
+      inputPlaceholder: "Ej.: Factura creada por error, venta duplicada...",
+      inputAttributes: {
+        maxlength: 500,
+        "aria-label": "Motivo de eliminación",
+      },
+      inputValidator: (valor) => {
+        if (!valor || valor.trim().length < 5) {
+          return "Debes escribir un motivo de al menos 5 caracteres.";
+        }
+      },
       showCancelButton: true,
-      confirmButtonText: "Eliminar",
+      confirmButtonText: "Eliminar factura",
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#dc3545",
+      cancelButtonColor: "#6c757d",
+      reverseButtons: true,
     });
 
-    if (!confirmar.isConfirmed) return;
+    if (!resultado.isConfirmed) return;
+
+    const motivo = resultado.value.trim();
 
     try {
-      await api.delete(`/facturas/${id}`);
+      await api.delete(`/facturas/${id}`, {
+        data: { motivo },
+      });
 
-      Swal.fire({
+      await Swal.fire({
         icon: "success",
         title: "Factura eliminada",
-        timer: 1500,
+        text: "El motivo quedó registrado en la auditoría.",
+        timer: 1800,
         showConfirmButton: false,
       });
 
-      cargarFacturas();
+      await cargarFacturas();
     } catch (error) {
-      console.error(error);
+      console.error("Error al eliminar factura:", error);
 
-      Swal.fire(
-        "Error",
-        error.response?.data?.mensaje || "No se pudo eliminar la factura.",
-        "error",
-      );
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo eliminar",
+        text:
+          error.response?.data?.mensaje ||
+          "Ocurrió un error al eliminar la factura.",
+      });
     }
   };
 

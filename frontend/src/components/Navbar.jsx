@@ -347,6 +347,20 @@ function Navbar() {
                     Nueva factura
                   </Link>
 
+                  {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+                    <Link
+                      to="/facturas-eliminadas"
+                      className={`sidebar-sublink ${
+                        estaActivo("/facturas-eliminadas")
+                          ? "sidebar-sublink-active"
+                          : ""
+                      }`}
+                      onClick={() => setSidebarAbierto(false)}
+                    >
+                      Facturas eliminadas
+                    </Link>
+                  )}
+
                   <Link
                     to="/historial-facturas"
                     className={`sidebar-sublink ${

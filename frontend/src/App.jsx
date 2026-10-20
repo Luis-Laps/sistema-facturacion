@@ -20,6 +20,7 @@ import ImprimirCierreCaja from "./pages/ImprimirCierreCaja";
 import ImprimirFacturaAbierta from "./components/ImprimirFacturaAbierta";
 import Inventario from "./pages/Inventario";
 import AvisoNotificacion from "./components/AvisoNotificacion";
+import FacturasEliminadas from "./pages/FacturasEliminadas";
 
 // ==========================================
 // FERRETERÍA
@@ -124,6 +125,20 @@ function App() {
                     element={<ImprimirFacturaAbierta />}
                   />
                   <Route path="/inventario" element={<Inventario />} />
+
+                  {/* ==================================
+    FACTURAS ELIMINADAS
+    SOLO ADMIN Y SUPER_ADMIN
+================================== */}
+
+                  <Route
+                    path="/facturas-eliminadas"
+                    element={
+                      <ProtectedRoute roles={["ADMIN", "SUPER_ADMIN"]}>
+                        <FacturasEliminadas />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* ==================================
                       REPORTES
