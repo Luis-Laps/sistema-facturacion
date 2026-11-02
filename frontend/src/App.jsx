@@ -67,7 +67,14 @@ function App() {
                       PRINCIPAL
                   ================================== */}
 
-                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute roles={["ADMIN", "SUPER_ADMIN"]}>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* ==================================
                       PRODUCTOS

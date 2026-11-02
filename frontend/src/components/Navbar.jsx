@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { obtenerRol } from "../utils/auth";
 import api from "../services/api";
+import Swal from "sweetalert2";
 
 import "../styles/sidebar.css";
 
@@ -13,19 +14,19 @@ function Navbar() {
   const rol = obtenerRol();
 
   const [empresa, setEmpresa] = useState(null);
-
   const [modulos, setModulos] = useState([]);
-
   const [menuAbierto, setMenuAbierto] = useState(null);
-
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
+
+  // Estado de caja
+  const [cajaAbierta, setCajaAbierta] = useState(null);
+  const [cargandoCaja, setCargandoCaja] = useState(false);
 
   // ==========================================
   // CARGAR EMPRESA Y MÓDULOS
   // ==========================================
 
   useEffect(() => {
-    // SUPER ADMIN no pertenece a una empresa
     if (rol === "SUPER_ADMIN") {
       setEmpresa(null);
       setModulos([]);
@@ -34,17 +35,8 @@ function Navbar() {
 
     const cargarDatos = async () => {
       try {
-        // ==========================================
-        // EMPRESA
-        // ==========================================
-
         const empresaResponse = await api.get("/configuracion");
-
         setEmpresa(empresaResponse.data);
-
-        // ==========================================
-        // MÓDULOS ASIGNADOS
-        // ==========================================
 
         const modulosResponse = await api.get("/modulos/mis-modulos");
 
@@ -53,7 +45,6 @@ function Navbar() {
         );
       } catch (error) {
         console.error("Error al cargar empresa y módulos:", error);
-
         setModulos([]);
       }
     };
@@ -70,12 +61,46 @@ function Navbar() {
   };
 
   // ==========================================
+  // FORMATO DE MONEDA
+  // ==========================================
+
+  const moneda = (valor) =>
+    Number(valor || 0).toLocaleString("es-DO", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  // ==========================================
+  // VERIFICAR CAJA
+  // ==========================================
+
+  const verificarCaja = async () => {
+    try {
+      setCargandoCaja(true);
+
+      const response = await api.get("/cajas/abierta");
+
+      setCajaAbierta(response.data || null);
+    } catch (error) {
+      console.error("Error verificando caja:", error);
+      setCajaAbierta(null);
+    } finally {
+      setCargandoCaja(false);
+    }
+  };
+
+  useEffect(() => {
+    if (rol === "CAJERO") {
+      verificarCaja();
+    }
+  }, [rol]);
+
+  // ==========================================
   // CERRAR SESIÓN
   // ==========================================
 
   const cerrarSesion = () => {
     localStorage.removeItem("token");
-
     navigate("/");
   };
 
@@ -85,7 +110,6 @@ function Navbar() {
 
   const navegar = (ruta) => {
     navigate(ruta);
-
     setSidebarAbierto(false);
     setMenuAbierto(null);
   };
@@ -113,11 +137,261 @@ function Navbar() {
     setMenuAbierto((actual) => (actual === menu ? null : menu));
   };
 
+  // ==========================================
+  // ABRIR CAJA - CAJERO
+  // ==========================================
+
+  const abrirCaja = async () => {
+    try {
+      const response = await api.get("/cajas/abierta");
+
+      if (response.data) {
+        setCajaAbierta(response.data);
+
+        await Swal.fire({
+          icon: "info",
+          title: "Caja ya abierta",
+          text: "Ya existe una caja abierta. No necesitas abrir otra.",
+          confirmButtonColor: "#198754",
+        });
+
+        return;
+      }
+
+      const { value, isConfirmed } = await Swal.fire({
+        title: "Apertura de Caja",
+        text: "Ingrese el monto inicial de la caja.",
+        input: "number",
+        inputLabel: "Monto inicial",
+        inputPlaceholder: "0.00",
+        inputAttributes: {
+          min: 0,
+          step: "0.01",
+        },
+        confirmButtonText: "Abrir Caja",
+        confirmButtonColor: "#198754",
+        showCancelButton: true,
+        cancelButtonText: "Cancelar",
+        inputValidator: (value) => {
+          if (value === "" || value === null) {
+            return "Debe indicar un monto.";
+          }
+
+          if (!Number.isFinite(Number(value)) || Number(value) < 0) {
+            return "Ingrese un monto válido.";
+          }
+        },
+      });
+
+      if (!isConfirmed) return;
+
+      await api.post("/cajas/abrir", {
+        monto_inicial: Number(value),
+      });
+
+      await verificarCaja();
+
+      await Swal.fire({
+        icon: "success",
+        title: "Caja abierta correctamente",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error abriendo caja:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.mensaje || "No fue posible abrir la caja.",
+      });
+    }
+  };
+
+  // ==========================================
+  // CERRAR CAJA - MISMA LÓGICA DEL DASHBOARD
+  // ==========================================
+
+  const cerrarCaja = async () => {
+    if (!cajaAbierta) {
+      await verificarCaja();
+      return;
+    }
+
+    const debeHaber =
+      Number(cajaAbierta.monto_inicial || 0) +
+      Number(cajaAbierta.efectivo || 0);
+
+    const { value, isConfirmed } = await Swal.fire({
+      title: "Cerrar Caja",
+      html: `
+        <div style="text-align:left">
+          <div class="mb-2">
+            <strong>Monto inicial:</strong>
+            RD$ ${moneda(cajaAbierta.monto_inicial)}
+          </div>
+
+          <div class="mb-2">
+            <strong>Ventas en efectivo:</strong>
+            RD$ ${moneda(cajaAbierta.efectivo)}
+          </div>
+
+          <div class="mb-2">
+            <strong>Ventas con tarjeta:</strong>
+            RD$ ${moneda(cajaAbierta.tarjeta)}
+          </div>
+
+          <div class="mb-2">
+            <strong>Ventas por transferencia:</strong>
+            RD$ ${moneda(cajaAbierta.transferencia)}
+          </div>
+
+          <div class="mb-2">
+            <strong>Ventas totales:</strong>
+            RD$ ${moneda(
+              Number(cajaAbierta.efectivo || 0) +
+                Number(cajaAbierta.tarjeta || 0) +
+                Number(cajaAbierta.transferencia || 0),
+            )}
+          </div>
+
+          <hr />
+
+          <div>
+            <strong>Debe haber:</strong>
+          </div>
+
+          <h3 style="color:#198754">
+            RD$ ${moneda(debeHaber)}
+          </h3>
+        </div>
+      `,
+      input: "number",
+      inputLabel: "Dinero contado",
+      inputPlaceholder: "0.00",
+      inputAttributes: {
+        min: 0,
+        step: "0.01",
+      },
+      showCancelButton: true,
+      confirmButtonText: "Cerrar Caja",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#dc3545",
+      inputValidator: (value) => {
+        if (value === "" || value === null) {
+          return "Debe indicar el dinero contado.";
+        }
+
+        if (Number(value) < 0) {
+          return "El dinero contado no puede ser negativo.";
+        }
+      },
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+      const response = await api.post("/cajas/cerrar", {
+        dinero_contado: Number(value),
+      });
+
+      await verificarCaja();
+
+      const resultado = await Swal.fire({
+        icon: "success",
+        title: "Caja cerrada",
+        html: `
+          <div style="text-align:left">
+
+            <p>
+              <strong>Debe haber:</strong>
+              RD$ ${moneda(response.data.debeHaber)}
+            </p>
+
+            <p>
+              <strong>Diferencia:</strong>
+              RD$ ${moneda(response.data.diferencia)}
+            </p>
+
+            <hr />
+
+            <p>
+              <strong>Facturas:</strong>
+              ${response.data.cantidadFacturas || 0}
+            </p>
+
+            <p>
+              <strong>Propinas aplicadas:</strong>
+              ${response.data.cantidadPropinasAplicadas || 0}
+            </p>
+
+            <p>
+              <strong>Total propinas:</strong>
+              RD$ ${moneda(response.data.totalPropinas)}
+            </p>
+
+            <p>
+              <strong>Productos vendidos:</strong>
+              ${response.data.cantidadProductos || 0}
+            </p>
+
+            <p>
+              <strong>Total vendido:</strong>
+              RD$ ${moneda(response.data.totalVentas)}
+            </p>
+
+            <hr />
+
+            <p>
+              <strong>Efectivo:</strong>
+              RD$ ${moneda(response.data.totalEfectivo)}
+            </p>
+
+            <p>
+              <strong>Tarjeta:</strong>
+              RD$ ${moneda(response.data.totalTarjeta)}
+            </p>
+
+            <p>
+              <strong>Transferencia:</strong>
+              RD$ ${moneda(response.data.totalTransferencia)}
+            </p>
+
+            <p>
+              <strong>Clientes atendidos:</strong>
+              ${response.data.clientesAtendidos || 0}
+            </p>
+
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "🖨️ Imprimir reporte",
+        cancelButtonText: "Aceptar",
+        reverseButtons: true,
+        confirmButtonColor: "#198754",
+      });
+
+      if (resultado.isConfirmed && response.data.cajaId) {
+        navigate(`/imprimir-cierre-caja/${response.data.cajaId}`);
+      }
+    } catch (error) {
+      console.error("Error cerrando caja:", error);
+
+      Swal.fire(
+        "Error",
+        error.response?.data?.mensaje || "No fue posible cerrar la caja.",
+        "error",
+      );
+    }
+  };
+
+  // ==========================================
+  // RENDER
+  // ==========================================
+
   return (
     <>
-      {/* ======================================
-          BARRA SUPERIOR MÓVIL
-      ====================================== */}
+      {/* BARRA SUPERIOR MÓVIL */}
 
       <div className="mobile-topbar">
         <button
@@ -146,9 +420,7 @@ function Navbar() {
         </button>
       </div>
 
-      {/* ======================================
-          OVERLAY MÓVIL
-      ====================================== */}
+      {/* OVERLAY MÓVIL */}
 
       {sidebarAbierto && (
         <div
@@ -157,9 +429,7 @@ function Navbar() {
         />
       )}
 
-      {/* ======================================
-          SIDEBAR
-      ====================================== */}
+      {/* SIDEBAR */}
 
       <aside
         className={`sidebar ${sidebarAbierto ? "sidebar-open" : ""}`}
@@ -167,13 +437,11 @@ function Navbar() {
           "--empresa-color": empresa?.color_principal || "#198754",
         }}
       >
-        {/* ====================================
-            EMPRESA
-        ==================================== */}
+        {/* EMPRESA */}
 
         <div className="sidebar-brand">
           <Link
-            to="/dashboard"
+            to={rol === "CAJERO" ? "/facturas" : "/dashboard"}
             onClick={() => setSidebarAbierto(false)}
             className="sidebar-brand-link"
           >
@@ -190,38 +458,65 @@ function Navbar() {
 
             <div className="sidebar-company-name">
               <strong>{empresa?.nombre || "Sistema"}</strong>
-
               <span>Sistema de Facturación</span>
             </div>
           </Link>
         </div>
 
-        {/* ====================================
-            NAVEGACIÓN
-        ==================================== */}
+        {/* NAVEGACIÓN */}
 
         <div className="sidebar-content">
           <div className="sidebar-section-title">PRINCIPAL</div>
 
-          {/* ==================================
-              DASHBOARD
-          ================================== */}
+          {/* CAJA - SOLO CAJERO */}
 
-          <Link
-            to="/dashboard"
-            className={`sidebar-link ${
-              estaActivo("/dashboard") ? "sidebar-link-active" : ""
-            }`}
-            onClick={() => setSidebarAbierto(false)}
-          >
-            <span className="sidebar-icon">🏠</span>
+          {rol === "CAJERO" && (
+            <>
+              {!cargandoCaja &&
+                (!cajaAbierta ? (
+                  <button
+                    type="button"
+                    className="sidebar-link sidebar-link-button"
+                    onClick={() => {
+                      setSidebarAbierto(false);
+                      abrirCaja();
+                    }}
+                  >
+                    <span className="sidebar-icon">💵</span>
+                    <span className="sidebar-link-text">Abrir Caja</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="sidebar-link sidebar-link-button"
+                    onClick={() => {
+                      setSidebarAbierto(false);
+                      cerrarCaja();
+                    }}
+                  >
+                    <span className="sidebar-icon">🔒</span>
+                    <span className="sidebar-link-text">Cerrar Caja</span>
+                  </button>
+                ))}
+            </>
+          )}
 
-            <span>Dashboard</span>
-          </Link>
+          {/* DASHBOARD - ADMINISTRADORES */}
 
-          {/* ==================================
-              PRODUCTOS
-          ================================== */}
+          {(rol === "ADMIN" || rol === "SUPER_ADMIN") && (
+            <Link
+              to="/dashboard"
+              className={`sidebar-link ${
+                estaActivo("/dashboard") ? "sidebar-link-active" : ""
+              }`}
+              onClick={() => setSidebarAbierto(false)}
+            >
+              <span className="sidebar-icon">🏠</span>
+              <span>Dashboard</span>
+            </Link>
+          )}
+
+          {/* PRODUCTOS */}
 
           {tieneModulo("PRODUCTOS") &&
             (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
@@ -233,14 +528,11 @@ function Navbar() {
                 onClick={() => setSidebarAbierto(false)}
               >
                 <span className="sidebar-icon">📦</span>
-
                 <span>Productos</span>
               </Link>
             )}
 
-          {/* ==================================
-              INVENTARIO
-          ================================== */}
+          {/* INVENTARIO */}
 
           {tieneModulo("INVENTARIO") &&
             (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
@@ -252,14 +544,11 @@ function Navbar() {
                 onClick={() => setSidebarAbierto(false)}
               >
                 <span className="sidebar-icon">📊</span>
-
                 <span>Inventario</span>
               </Link>
             )}
 
-          {/* ==================================
-              CLIENTES
-          ================================== */}
+          {/* CLIENTES */}
 
           {tieneModulo("CLIENTES") &&
             (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
@@ -271,14 +560,11 @@ function Navbar() {
                 onClick={() => setSidebarAbierto(false)}
               >
                 <span className="sidebar-icon">👥</span>
-
                 <span>Clientes</span>
               </Link>
             )}
 
-          {/* ==================================
-              PROVEEDORES
-          ================================== */}
+          {/* PROVEEDORES */}
 
           {tieneModulo("PROVEEDORES") &&
             (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
@@ -290,14 +576,11 @@ function Navbar() {
                 onClick={() => setSidebarAbierto(false)}
               >
                 <span className="sidebar-icon">🚚</span>
-
                 <span>Proveedores</span>
               </Link>
             )}
 
-          {/* ==================================
-              CONTROL DE ORDEN
-          ================================== */}
+          {/* CONTROL DE ORDEN */}
 
           {tieneModulo("CONTROL_ORDEN") && (
             <Link
@@ -308,14 +591,11 @@ function Navbar() {
               onClick={() => setSidebarAbierto(false)}
             >
               <span className="sidebar-icon">🍽️</span>
-
               <span>Control de Orden</span>
             </Link>
           )}
 
-          {/* ==================================
-              FACTURACIÓN
-          ================================== */}
+          {/* FACTURACIÓN */}
 
           {tieneModulo("FACTURACION") && (
             <>
@@ -327,9 +607,7 @@ function Navbar() {
                 onClick={() => toggleMenu("facturacion")}
               >
                 <span className="sidebar-icon">🧾</span>
-
                 <span className="sidebar-link-text">Facturación</span>
-
                 <span className="sidebar-arrow">
                   {menuAbierto === "facturacion" ? "⌃" : "⌄"}
                 </span>
@@ -387,70 +665,67 @@ function Navbar() {
             </>
           )}
 
-          {/* ==================================
-              FERRETERÍA
-          ================================== */}
+          {/* FERRETERÍA */}
 
           {tieneModulo("FERRETERIA") && (
-            <button
-              type="button"
-              className={`sidebar-link sidebar-link-button ${
-                menuAbierto === "ferreteria" ? "sidebar-link-open" : ""
-              }`}
-              onClick={() => toggleMenu("ferreteria")}
-            >
-              <span className="sidebar-icon">🔧</span>
+            <>
+              <button
+                type="button"
+                className={`sidebar-link sidebar-link-button ${
+                  menuAbierto === "ferreteria" ? "sidebar-link-open" : ""
+                }`}
+                onClick={() => toggleMenu("ferreteria")}
+              >
+                <span className="sidebar-icon">🔧</span>
+                <span className="sidebar-link-text">Ferretería</span>
+                <span className="sidebar-arrow">
+                  {menuAbierto === "ferreteria" ? "⌃" : "⌄"}
+                </span>
+              </button>
 
-              <span className="sidebar-link-text">Ferretería</span>
+              {menuAbierto === "ferreteria" && (
+                <div className="sidebar-submenu">
+                  <Link
+                    to="/ferreteria/nueva-factura"
+                    className={`sidebar-sublink ${
+                      estaActivo("/ferreteria/nueva-factura")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Nueva factura
+                  </Link>
 
-              <span className="sidebar-arrow">
-                {menuAbierto === "ferreteria" ? "⌃" : "⌄"}
-              </span>
-            </button>
+                  <Link
+                    to="/ferreteria/facturas-abiertas"
+                    className={`sidebar-sublink ${
+                      estaActivo("/ferreteria/facturas-abiertas")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Facturas abiertas
+                  </Link>
+
+                  <Link
+                    to="/ferreteria/historial-facturas"
+                    className={`sidebar-sublink ${
+                      estaActivo("/ferreteria/historial-facturas")
+                        ? "sidebar-sublink-active"
+                        : ""
+                    }`}
+                    onClick={() => setSidebarAbierto(false)}
+                  >
+                    Historial
+                  </Link>
+                </div>
+              )}
+            </>
           )}
 
-          {tieneModulo("FERRETERIA") && menuAbierto === "ferreteria" && (
-            <div className="sidebar-submenu">
-              <Link
-                to="/ferreteria/nueva-factura"
-                className={`sidebar-sublink ${
-                  estaActivo("/ferreteria/nueva-factura")
-                    ? "sidebar-sublink-active"
-                    : ""
-                }`}
-                onClick={() => setSidebarAbierto(false)}
-              >
-                Nueva factura
-              </Link>
-
-              <Link
-                to="/ferreteria/facturas-abiertas"
-                className={`sidebar-sublink ${
-                  estaActivo("/ferreteria/facturas-abiertas")
-                    ? "sidebar-sublink-active"
-                    : ""
-                }`}
-                onClick={() => setSidebarAbierto(false)}
-              >
-                Facturas abiertas
-              </Link>
-              <Link
-                to="/ferreteria/historial-facturas"
-                className={`sidebar-sublink ${
-                  estaActivo("/ferreteria/historial-facturas")
-                    ? "sidebar-sublink-active"
-                    : ""
-                }`}
-                onClick={() => setSidebarAbierto(false)}
-              >
-                Historial
-              </Link>
-            </div>
-          )}
-
-          {/* ==================================
-              REPORTES
-          ================================== */}
+          {/* REPORTES */}
 
           {tieneModulo("REPORTES") &&
             (rol === "ADMIN" || rol === "SUPER_ADMIN") && (
@@ -463,9 +738,7 @@ function Navbar() {
                   onClick={() => toggleMenu("reportes")}
                 >
                   <span className="sidebar-icon">📈</span>
-
                   <span className="sidebar-link-text">Reportes</span>
-
                   <span className="sidebar-arrow">
                     {menuAbierto === "reportes" ? "⌃" : "⌄"}
                   </span>
@@ -489,9 +762,7 @@ function Navbar() {
               </>
             )}
 
-          {/* ==================================
-              ADMINISTRACIÓN
-          ================================== */}
+          {/* ADMINISTRACIÓN */}
 
           {rol === "ADMIN" && (
             <>
@@ -507,9 +778,7 @@ function Navbar() {
                 onClick={() => toggleMenu("administracion")}
               >
                 <span className="sidebar-icon">⚙️</span>
-
                 <span className="sidebar-link-text">Administración</span>
-
                 <span className="sidebar-arrow">
                   {menuAbierto === "administracion" ? "⌃" : "⌄"}
                 </span>
@@ -543,9 +812,7 @@ function Navbar() {
             </>
           )}
 
-          {/* ==================================
-              SUPER ADMIN
-          ================================== */}
+          {/* SUPER ADMIN */}
 
           {rol === "SUPER_ADMIN" && (
             <>
@@ -561,16 +828,13 @@ function Navbar() {
                 onClick={() => setSidebarAbierto(false)}
               >
                 <span className="sidebar-icon">🏢</span>
-
                 <span>Empresas</span>
               </Link>
             </>
           )}
         </div>
 
-        {/* ====================================
-            PARTE INFERIOR
-        ==================================== */}
+        {/* PARTE INFERIOR */}
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
@@ -589,7 +853,9 @@ function Navbar() {
                   ? "Super Administrador"
                   : rol === "ADMIN"
                     ? "Administrador"
-                    : "Usuario"}
+                    : rol === "CAJERO"
+                      ? "Cajero"
+                      : "Usuario"}
               </strong>
 
               <span>{rol || "Usuario"}</span>
@@ -602,7 +868,6 @@ function Navbar() {
             onClick={cerrarSesion}
           >
             <span>🚪</span>
-
             <span>Cerrar sesión</span>
           </button>
         </div>

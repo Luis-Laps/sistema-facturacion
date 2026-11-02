@@ -8,8 +8,9 @@ export const obtenerRol = () => {
 
     const decoded = jwtDecode(token);
 
-    return decoded.rol;
+    return decoded.rol?.trim().toUpperCase() || null;
   } catch (error) {
+    console.error("Error al obtener el rol:", error);
     return null;
   }
 };
